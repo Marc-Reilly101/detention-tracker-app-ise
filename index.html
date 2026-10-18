@@ -24,11 +24,53 @@
             <!-- Initially went with height: 55px, but it looked too thick. 45 pixels just right -->
             <button class="button" onclick="logIn()">Submit</button> </p>
         </div>
+
+
+
         <div id="loadingscreen" class="centered hidden">
             <img style="width: 250px; height: 250px;" src="assets/crest.png"/> </p>
             <!-- 150px * 150px was also too small -->
             <i>Loading...</i> </p>
             <i>Fetching Data...</i> </p>
+        </div>
+
+
+
+        <div id="mainscreen" class="hidden">
+            <div class="header"><b>St. Colman's | Detention Book</b></div>
+            <!-- webcontent classes used to establish margin sizes, and element alignment -->
+            <div class="webcontent">
+                <button class="button" onclick="UI.goTo('addstudentscreen', 'mainscreen')">Add Student (+)</button>
+
+                <select id="mainscreen_yearFilter" class="selectionBox">
+                    <option>All Years</option>
+                    <option>First Year</option>
+                    <option>Second Year</option>
+                    <option>Third Year</option>
+                    <option>Transition Year</option>
+                    <option>Fifth Year</option>
+                    <option>Sixth Year</option>
+                </select>
+                <!-- year groups defined literally in HTML -->
+
+                <select id="mainscreen_timeFilter" class="selectionBox">
+                    <option>All</option>
+                    <option>Today</option>
+                    <option>Upcoming</option>
+                </select>
+                <!-- same for "time filters" -->
+
+                <div id="mainscreen_toolbar" style="float: right;">
+                    <b class="underline-hover" style="margin-right: 12px;" onclick="UI.goTo('recordscreen', 'mainscreen')">Records</b>
+                    <b class="underline-hover" style="margin-right: 12px;" onclick="UI.goTo('profilesearchscreen', 'mainscreen')">Profiles</b>
+                    <b class="underline-hover" style="margin-right: 12px;" onclick="attendanceFunctions.verifyDetentionToday()">Attendance</b>
+                </div> </p>
+                <b style="color: red;" class="underline-hover hidden" id="mainscreen_fridayDetentionNotice" onclick="UI.goTo('fridaydetentionsneededscreen', 'mainscreen')"></b> </p>
+                <hr/>
+                <u><b><i>Date Format: yyyy-mm-dd</i></b></u> </p>
+                <i id="mainscreen_emptyLabel" style="display: none;">Nothing here at the moment...</i> </p>
+                <div id="mainscreen_detentionsList"></div>
+            </div>
         </div>
     </div>
 </body>
