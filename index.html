@@ -41,6 +41,9 @@
             <!-- webcontent classes used to establish margin sizes, and element alignment -->
             <div class="webcontent">
                 <button class="button" onclick="UI.goTo('addstudentscreen', 'mainscreen')">Add Student (+)</button>
+                <span class="lineBreak"></span>
+                <!-- these span elements with a "lineBreak" class are toggled to include a paragraph element for mobile users (as determined in app.js) 
+                     to improve layout of viewport - not the best implementation but it works well-->
 
                 <select id="mainscreen_yearFilter" class="selectionBox">
                     <option>All Years</option>
@@ -53,6 +56,7 @@
                 </select>
                 <!-- year groups defined literally in HTML -->
 
+                <span class="lineBreak"></span>
                 <select id="mainscreen_timeFilter" class="selectionBox">
                     <option>All</option>
                     <option>Today</option>
@@ -60,6 +64,7 @@
                 </select>
                 <!-- same for "time filters" -->
 
+                <span class="lineBreak"></span>
                 <div id="mainscreen_toolbar" style="float: right;">
                     <b class="underline-hover" style="margin-right: 12px;" onclick="UI.goTo('recordscreen', 'mainscreen')">Records</b>
                     <b class="underline-hover" style="margin-right: 12px;" onclick="UI.goTo('profilesearchscreen', 'mainscreen')">Profiles</b>
@@ -70,6 +75,23 @@
                 <u><b><i>Date Format: yyyy-mm-dd</i></b></u> </p>
                 <i id="mainscreen_emptyLabel" style="display: none;">Nothing here at the moment...</i> </p>
                 <div id="mainscreen_detentionsList"></div>
+            </div>
+        </div>
+
+
+
+        <div id="recordscreen" class="hidden">
+            <div class="header"><b class="underline-hover" onclick="UI.goTo('mainscreen', 'recordscreen')">Back</b></div>
+            <div class="webcontent">
+                <h2>Detention Records</h2>
+                <input type="text" class="textbox" placeholder="Name Filter..." id="recordscreen_nameFilter"/> <span class="lineBreak"></span>
+                <input type="date" class="textbox" id="recordscreen_dateFilter"/> </p>
+                <p>Leave field(s) blank for no filter.</p>
+                <hr/>
+                <u><b><i>Date Format: yyyy-mm-dd</i></b></u> </p>
+                <i id="recordscreen_emptyLabel" style="display: none;">Nothing here at the moment...</i> </p>
+                <!-- format for element IDs: screenname_elementDesignation -->
+                <div id="recordscreen_detentionsList"></div>
             </div>
         </div>
     </div>
