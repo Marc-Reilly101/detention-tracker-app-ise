@@ -14,5 +14,20 @@
     <!-- link "Poppins" font from google fonts - cleaner than Arial -->
 </head>
 <body>
-
+    <div id="app">
+        <!-- app div contains entire single-page application. Useful for app.js (for element resizing on mobile devices) -->
+        <div id="passwordscreen" class="centered">
+            <img style="width: 250px; height: 250px;" src="assets/crest.png"/> </p>
+            <h1>St. Colman's College</h1>
+            <h2>Detention Book</h2>
+            <input type="password" class="textbox" style="height: 45px; width: 400px;" placeholder="Enter administrative password..." id="passwordscreen_passwordBox"/> </p>
+            <!-- Initially went with height: 55px, but it looked too thick. 45 pixels just right -->
+            <button class="button" onclick="logIn()">Submit</button> </p>
+        </div>
+        <div id="loadingscreen" class="centered hidden">
+            <img style="width: 150px; height: 150px;" src="assets/crest.png"/> </p>
+            <i>Loading...</i> </p>
+            <i>Fetching Data...</i> </p>
+        </div>
+    </div>
 </body>
