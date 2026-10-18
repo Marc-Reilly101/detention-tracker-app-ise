@@ -94,5 +94,70 @@
                 <div id="recordscreen_detentionsList"></div>
             </div>
         </div>
+
+
+
+
+
+
+        <div id="addstudentscreen" class="hidden">
+            <div class="header"><b class="underline-hover" onclick="UI.goTo('mainscreen', 'addstudentscreen')">Back</b></div>
+            <div class="webcontent centered">
+                <h2>Add Student to Detention</h2>
+
+                <div class="container">
+                    <b><u>Student Details:</u></b> </p>
+                    <input type="text" class="textbox" placeholder="Enter student name..." id="addstudentscreen_nameBox"/> </p>
+                    <select class="long-selectionBox" id="addstudentscreen_yearBox">
+                        <option>-- Select Year Group --</option>
+                        <option>First Year</option>
+                        <option>Second Year</option>
+                        <option>Third Year</option>
+                        <option>Transition Year</option>
+                        <option>Fifth Year</option>
+                        <option>Sixth Year</option>
+                    </select>
+                </div> </p>
+
+                <div class="container">
+                    <b><u>Detention Type:</u></b> </p>
+                    <p>
+                        Single Detention: <input type="radio" name="addstudentscreen_detentionType" id="addstudentscreen_singleDetentionRadio"/>
+                        <span class="lineBreak"></span>
+                        Double Detention: <input type="radio" name="addstudentscreen_detentionType" id="addstudentscreen_doubleDetentionRadio"/>
+                    </p>
+                    <p>Friday Detention: <input type="radio" name="addstudentscreen_detentionType" id="addstudentscreen_fridayDetentionRadio"/></p>
+                    <div id="addstudentscreen_singleDetentionConfig" class="hidden">
+                        <hr/>
+                        <b><i>Enter a valid date</i></b> </p>
+                        <input type="date" class="textbox" id="addstudentscreen_singleDetentionDateBox"/>
+                    </div>
+                    <div id="addstudentscreen_doubleDetentionConfig" class="hidden">
+                        <hr/>
+                        <b><i>Enter two valid dates</i></b> </p>
+                        <input type="date" class="textbox" id="addstudentscreen_doubleDetentionDateBoxOne"/> </p>
+                        <input type="date" class="textbox" id="addstudentscreen_doubleDetentionDateBoxTwo"/>
+                    </div>
+                    <div id="addstudentscreen_fridayDetentionConfig" class="hidden">
+                        <hr/>
+                        <b><i>Enter a valid date</i></b> </p>
+                        <input type="date" class="textbox" id="addstudentscreen_fridayDetentionDateBox"/>
+                    </div>
+                </div> </p>
+
+                <div class="container">
+                    <b><u>Detention Information:</u></b> </p>
+                    <textarea id="addstudentscreen_customReasonBox" style="width: 480px; height: 360px;"></textarea>
+                </div> </p>
+                
+                <button class="button" onclick="entryAdditionFunctions.addDetentionEntry()">Submit</button>
+            </div>
+        </div>
+
+
+
+
+
+
     </div>
 </body>
