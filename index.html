@@ -206,6 +206,34 @@
         </div>
 
 
+        <div id="profilesearchscreen" class="hidden">
+            <div class="header"> <b class="underline-hover" onclick="UI.goTo('mainscreen', 'profilesearchscreen')">Back</b> </div>
+            <div class="webcontent">
+                <h2>Student Profiles</h2>
+                <input type="search" class="textbox" style="height: 45px; width: 400px;" placeholder="Enter student..." id="profilesearchscreen_searchBox"/>
+                <span class="lineBreak"></span>
+                <button class="button" value="Search" onclick="profileFunctions.searchProfiles()">Search</button>
+                <hr/>
+                <div id="profilesearchscreen_profileList"></div>
+            </div>
+        </div>
+
+        <div id="viewprofilescreen" class="hidden">
+            <div class="header"> <b class="underline-hover" onclick="UI.goTo('profilesearchscreen', 'viewprofilescreen')">Back</b> </div>
+            <div class="webcontent centered">
+                <h2 id="viewprofilescreen_studentNameLabel"></h2>
+                <h3 id="viewprofilescreen_yearGroupLabel"></h3>
+                <hr/>
+                <b style="color: red;" id="viewprofilescreen_fridayDetentionNeededLabel"></b> </p>
+
+                <p id="viewprofilescreen_detentionsLabel"></p>
+                <p id="viewprofilescreen_fridayDetentionsLabel"></p>
+                <p id="viewprofilescreen_detentionsMissedLabel"></p>
+                <p id="viewprofilescreen_detentionsLateLabel"></p>
+                <!-- user-specific statistics tracking total detention count, absences and late detentions -->
+            </div>
+        </div>
+
 
     </div>
 </body>
