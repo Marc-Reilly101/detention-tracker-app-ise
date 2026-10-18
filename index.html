@@ -105,6 +105,10 @@
             <div class="webcontent centered">
                 <h2>Add Student to Detention</h2>
 
+                <p>Does Not Count (For rescheduled detentions) <input type="checkbox" id="addstudentscreen_countingCheckbox"/></p>
+                <!-- added a "does not count" checkbox to determine if the entry should contribute to a student's detention count.
+                    Added with automatic rescheduling as a way to manually determine this for specific use cases [user feedback] -->
+
                 <div class="container">
                     <b><u>Student Details:</u></b> </p>
                     <input type="text" class="textbox" placeholder="Enter student name..." id="addstudentscreen_nameBox"/> </p>
@@ -147,9 +151,34 @@
 
                 <div class="container">
                     <b><u>Detention Information:</u></b> </p>
-                    <textarea id="addstudentscreen_customReasonBox" style="width: 480px; height: 360px;"></textarea>
+                    <select class="long-selectionBox" id="addstudentscreen_reasonBox">
+                        <option>Phone not in Pouch</option>
+                        <option>Disruptive Behavior</option>
+                        <option>Disrespectful to Teacher</option>
+                        <option>Fighting</option>
+                        <option>Repeated Failure to Complete Homework</option>
+                        <option>Late for Class</option>
+                        <option>Smoking / Vaping</option>
+                        <option>Truancy</option>
+                        <option>Other</option>
+                    </select> </p>
+                    <!-- added a list of generic behavioral issues (most entries fall under one of these categories, so Year Heads no longer) 
+                      have to manually enter a report for issues that fall under these categories [user feedback] -->
+
+                    <div id="addstudentscreen_customReasonConfig" class="hidden">
+                        <textarea id="addstudentscreen_customReasonBox" style="width: 480px; height: 360px;"></textarea>
+                    </div> </p>
+
+                    <select class="long-selectionBox" id="addstudentscreen_teacherBox">
+                        <option>-- Scheduled By --</option>
+                        <option>Other</option>
+                    </select> </p>
+                    <div id="addstudentscreen_otherTeacherConfig" class="hidden">
+                        <input type="text" class="textbox" placeholder="Enter full name..." id="addstudentscreen_otherTeacherBox"/>
+                    </div>
+
+                    <!-- added a list of staff for accountability (see main report, section 3). Defined literally in HTML for production codebase [user feedback] -->
                 </div> </p>
-                
                 <button class="button" onclick="entryAdditionFunctions.addDetentionEntry()">Submit</button>
             </div>
         </div>
