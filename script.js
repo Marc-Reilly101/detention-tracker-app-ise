@@ -508,3 +508,84 @@ const entryAdditionFunctions = {
         return tag;
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const entryRemovalFunctions = {
+    removeDetentionEntry: async function() {
+        const container = this.parentElement;
+        const entryTag = entryRemovalFunctions.extractTagFromContainer(container);
+        if(!entryTag) {
+            App.showAlert("An unexpected error occured while deleting this entry.", "error");
+            console.error("Could not extract tag from container");
+            return;
+        }
+        const detention = entryRemovalFunctions.findDetentionByTag(App.detentions, entryTag);
+        if(!detention) {
+            App.showAlert("An unexpected error occured while deleting this entry.", "error");
+            console.error(`No detention found with tag: ${entryTag}`);
+            return;
+        }
+        const confirmed = await entryRemovalFunctions.confirmRemoval();
+        if(confirmed) await entryRemovalFunctions.performDetentionRemoval(entryTag);
+    },
+    //extractTagFromContainer() - Parses the 8-digit tag from DOM element
+    extractTagFromContainer: function(container) {
+        const tagElement = Array.from(container.children).find(child => child.innerHTML.includes("Tag"));
+        return tagElement ? tagElement.innerHTML.split(" ")[1] : null;
+    },
+    //findDetentionByTag() - Locates the detention record in App.detentions array
+    findDetentionByTag: function(detentions, tag) {
+        return detentions.find(detention => detention.tag == tag);
+    },
+    //getDetentionType() helper identifies detention category based on data structure:
+    getDetentionType: function(detention) {
+        if(detention.dateOne) return "double";
+        const detentionDate = new Date(detention.date);
+        detentionDate.setHours(0, 0, 0, 0);
+
+        /*I used to declare a seperate variable for temporary values like that seen below, and then return that variable, but
+          I learned that a tertiary statement can be used to both remove the need for that, and unnecessary if/else statements.
+        */
+        return detentionDate.getDay() == 5 ? "friday" : "single";
+    },
+    //confirmRemoval() - Prompts user for confirmation via modal dialog
+    confirmRemoval: async function() {
+        const result = await Swal.fire({
+            text: "Are you sure you want to remove this entry? (Note: removing an entry removes both current and record entries.)",
+            icon: "info",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Yes"
+        });
+        return result.isConfirmed;
+    },
+    //performDetentionRemoval() - Executes deletion and triggers data sync
+    performDetentionRemoval: async function(entryTag) {
+        const detentionIndex = App.detentions.findIndex(detention => detention.tag == entryTag);
+        App.fileReport("removal", App.detentions[detentionIndex])
+        if(detentionIndex != -1) App.detentions.splice(detentionIndex, 1);
+        App.showAlert("Entry successfully removed. Please do not close tab.", "success")
+        await App.updateData(false);
+    }
+};
