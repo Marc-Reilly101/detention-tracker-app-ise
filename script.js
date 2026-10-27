@@ -51,6 +51,7 @@ const UI = {
 
 
 const App = {
+    fetchError: false,
     detentions: [],
     studentProfiles: [],
     reports: [],
@@ -102,12 +103,43 @@ const App = {
     //readData() - Fetches from all three data bins in parallel using Promise.all with an Array.map() function.
     readData: async function() {
         if(localStorage.stcd_authenticated != "true") return;
-        for(let i = 0; i < this.bins.length; i++) {
-            //read logic
-        }
+        //Dedicated to use Promise.all for best performance (simultaneous operations)
+        await Promise.all(App.bins.map(async (bin) => {
+            try {
+                const response = await fetch(`/.netlify/functions/database-proxy?target=${encodeURIComponent(bin)}`, {method: "GET"});
+                /*a request is sent to the database-proxy function with the target bin encoded as a URI component to be 
+                processed by the function. (See CORS errors in main report)*/
+
+                if(!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                /*If the response is not successful, as indicated by response.ok, an error is thrown to the console. This usually 
+                  suggests network issues (caused by loss of wifi, or service outages).
+                */
+
+                const data = await response.json();
+                const responseData = data.record;
+                //extracts raw JSON data from response.record.
+
+                console.log(`Data fetched from bin: ${bin}`, responseData);
+                //the extracted data is logged to the console for debugging purposes if ever needed.
+
+                App.parseData(responseData, bin)
+                /*tShe raw JSON data is sent to App.parseData() with its corresponding bin argument. 
+                This assigns each local array (cache) to its corresponding data object.*/
+            } 
+            catch(error) {
+                console.error("Error fetching data:", error);
+                Swal.fire({
+                    text: "An error occured while fetching data. Please refresh page. If error persists, please contact appropriate administrators.",
+                    icon: "error",
+                    confirmButtonText: "OK",
+                }).then(() => location.reload());
+                App.fetchError = true;
+            }
+        }));
     },
     //parseData() - Distributes fetched data to appropriate properties
     parseData: async function(data, bin) {
+        if(App.fetchError) return;
         if(bin == "detentions") {
             App.detentions = data.detentions;
             App.attendanceTaken = data.attendanceData[0];
@@ -130,7 +162,36 @@ const App = {
     },
     //writeData() - Persists changes back to specific bin with version checking
     writeData: async function(binIndex) {
-        //write logic
+        if(App.fetchError) return;
+
+        //Three "bin configs" are initialised here, specifying what data needs to be written, and in what format. It is done so with stored callback functions.
+        const binConfigs = [
+            {data: () => ({detentions: App.detentions, attendanceData: [App.attendanceTaken, App.attendanceTakenDate]})},
+            {data: () => ({studentProfiles: App.studentProfiles})},
+            {data: () => App.reports.length > 0 ? {reports: App.reports} : null}
+        ];
+        const config = binConfigs[binIndex];
+        if(!config) return;
+        
+        const dataObject = config.data();
+        if(!dataObject) return;
+        const binName = App.bins[binIndex];
+
+        try {
+            //The bin name is sent securely with the request at this point for use by the proxy. This is done with the encodeURIComponent() method.
+            const response = await fetch(`/.netlify/functions/database-proxy?target=${encodeURIComponent(binName)}`, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json", "X-Version": version},
+                body: JSON.stringify(dataObject)
+            });
+            if(!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            const data = await response.json();
+            console.log(`Successfully updated bin: ${binName}`, data);
+        } 
+        catch(error) {
+            console.error("Error updating JSONBin:", error);
+            if(!App.staleVersionError) App.showAlert("An error occured while writing data - your changes have not saved. Please check your internet connection and refresh this page.", "error");
+        }
     },
     //The showAlert method serves as a centralised way to show standard dialogue boxes using the SweetAlert2 API. 
     //Other dialogue options such as prompts or confirmations are not handled by this method
