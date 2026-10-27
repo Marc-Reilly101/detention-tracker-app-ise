@@ -634,6 +634,81 @@ const entryAdditionFunctions = {
         } 
         while(existingTags.has(tag));
         return tag;
+    },
+    //This method reschedules a specific detention that is already specified on the viewentryscreen that the viewer must be accessing.
+    rescheduleDetention: function() {
+        var entryTag = viewentryscreen_tagLabel.innerHTML;
+        var detentionEntry = App.detentions.findIndex((detention) => detention.tag == entryTag);
+        if(!detentionEntry) {
+            App.showAlert("An error occured. Please try again.", "warning");
+            return;
+        }
+
+        //This is a unique Sweet Alert dialogue that uses HTML to render two seperate date inputs for rescheduling.
+        Swal.fire({
+            title: "Select date range",
+            html: `
+                <b>Date One</b> </p>
+                <input type="date" id="reschedule_dateOne" class="swal2-input"> </p>
+                <b>Date Two (Optional)</b> </p>
+                <input type="date" id="reschedule_dateTwo" class="swal2-input">
+            `,
+            confirmButtonText: "Confirm",
+            showCancelButton: true,
+            preConfirm: () => {
+                const start = document.getElementById("reschedule_dateOne").value;
+                const end = document.getElementById("reschedule_dateTwo").value;
+                if(!start) return false;
+
+                return { start, end };
+            }
+        }).then((result) => {
+            if(result.isConfirmed) {
+                !result.value.end ? this.addRescheduledDetention(App.detentions[detentionEntry], result.value.start) : this.addRescheduledDetention(App.detentions[detentionEntry], result.value.start, result.value.end);
+            }
+        });
+    },
+    addRescheduledDetention: async function(detention, dateOne, dateTwo=null) {
+        var dateConflict = false;
+        //Checks for a date conflict
+        App.detentions.forEach((entry) => {
+            if(entry.name == detention.name && entry.year == detention.year) {
+                if(entry.hasOwnProperty("date") && (entry.date == dateOne || entry.date == dateTwo)) dateConflict = true;
+                if(entry.hasOwnProperty("dateOne") && (entry.dateOne == dateOne || entry.dateOne == dateTwo || entry.dateTwo == dateOne || entry.dateTwo == dateTwo)) dateConflict = true;
+            }
+        });
+
+        //Handling for a detected date conflict
+        if(dateConflict) {
+            const result = await Swal.fire({
+                text: "This student is already scheduled for a detention on that date. Are you sure you want to continue?",
+                icon: "info",
+                showCancelButton: true,
+                confirmButtonColor: "#3085d6",
+                cancelButtonColor: "#d33",
+                confirmButtonText: "Yes"
+            });
+            if(!result.isConfirmed) return;
+        }
+
+        var teacherDesignation = "";
+        //Handy usage of .includes() method to check if (Originally) exists in the string, indicating that this badge should not be assigned alongside the teacher's name as the person responsible for the entry
+        detention.data.teacher.includes("(Originally)") ? teacherDesignation = detention.data.teacher : teacherDesignation = detention.data.teacher + " (Originally)";
+        var newTag = this.generateUniqueTag();
+
+        var entryObject;
+        if(dateTwo) entryObject = {name: detention.name, year: detention.year, dateOne: dateOne, dateTwo: dateTwo, reason: detention.reason, data: {teacher: teacherDesignation, date: detention.data.date, time: detention.data.time}, notCounting: true, tag: newTag};
+        if(!dateTwo) entryObject = {name: detention.name, year: detention.year, date: dateOne, reason: detention.reason, data: {teacher: teacherDesignation, date: detention.data.date, time: detention.data.time}, notCounting: true, tag: newTag};
+        
+        App.detentions.push(entryObject);
+        profileFunctions.updateOrCreateStudentProfile(detention.name, detention.year);
+        UI.goTo("mainscreen", "viewentryscreen");
+        mainscreen_yearFilter.value = "All Years";
+        mainscreen_timeFilter.value = "All";
+
+        App.fileReport("addition", entryObject);
+        App.updateData(false);
+        App.showAlert("Successfully rescheduled detention.", "success");
     }
 };
 
@@ -1023,6 +1098,11 @@ const viewEntryFunctions = {
         if(wasAbsent && detentionType == "single") viewentryscreen_absentLabel.innerHTML = "This student was absent for this detention.";
         if(wasAbsent && detentionType == "double") viewentryscreen_absentLabel.innerHTML = "This student was absent for one or both dates of this detention.";
 
+        wasRescheduled = false;
+        App.detentions.forEach((entry) => {
+            if(entry.notCounting && entry.tag == viewentryscreen_tagLabel.innerHTML) wasRescheduled = true;
+        });
+        if(wasRescheduled) viewentryscreen_rescheduledLabel.innerHTML = "This entry was rescheduled from its original date. It is set to 'non-counting.'";
     },
     //Formats single and double detention dates
     formatDetentionDates(detention) {
@@ -1497,10 +1577,88 @@ const attendanceFunctions = {
             });
         }
 
-        App.showAlert("Successfully submitted attendance. Please do not close tab.", "success");
-        UI.goTo("mainscreen", "attendancescreen");
-        App.fileReport("attendance", attendanceReport);
+        //Prompts the user to determine whether they would like all entries marked absent to be automatically rescheduled
+        const rescheduleAbsentDetentions = await Swal.fire({
+            text: "Reschedule absent detentions?",
+            icon: "question",
+            showDenyButton: true,
+            confirmButtonText: "Yes",
+            denyButtonText: "No"
+        });
+
+        if(rescheduleAbsentDetentions.isConfirmed) {
+            App.showAlert("Successfully submitted attendance. Please do not close tab.", "success");
+            UI.goTo("mainscreen", "attendancescreen");
+            App.fileReport("attendance", attendanceReport);
+            attendanceFunctions.rescheduleDetentions(absentStudents);
+        }
+        else {
+            App.showAlert("Successfully submitted attendance. Please do not close tab.", "success");
+            UI.goTo("mainscreen", "attendancescreen");
+            App.fileReport("attendance", attendanceReport);
+            App.updateData(false);
+        }
+    },
+    rescheduleDetentions: function(students) {
+        students.forEach((student) => {
+            const profileIndex = App.studentProfiles.findIndex((profile) => profile.name.toLowerCase() == student.toLowerCase());
+            if(profileIndex != -1) {
+                const year = App.studentProfiles[profileIndex].year;
+                const newDate = App.formatDate(attendanceFunctions.getAvailableDate(student));
+                /*Finds a valid date (weekday) via the getAvailableDate() method. It takes
+                  an argument for the student's name to avoid dates that a student may
+                  already be on detention.
+                */
+                const reason = `Missed detention on ${App.getCentralDate()}.`;
+                const dateOfSchedule = App.getCentralDate();
+                const teacher = "System";
+                const timeOfSchedule = App.getCurrentTimeString();
+                const notCounting = true;
+                const tag = entryAdditionFunctions.generateUniqueTag();
+
+
+                App.studentProfiles[profileIndex].detentions++;
+                App.detentions.push({name: student, year: year, date: newDate, reason: reason, data: {date: dateOfSchedule, teacher: teacher, time: timeOfSchedule}, notCounting: notCounting, tag: tag});
+            }
+        });
         App.updateData(false);
+    },
+    //Scans available dates for a valid weekday
+    getAvailableDate: function(name) {
+        const result = new Date();
+        result.setDate(result.getDate() + 1);
+        let satisfied = false;
+        let attempts = 0;
+
+        //Places a restriction on the search to prevent infinite loops. Checks if 365 attempts were made, indicating no available date in the whole year was found
+        while(!satisfied && attempts < 365) {
+            satisfied = attendanceFunctions.isValidDate(result, name);
+            if(!satisfied) {
+                result.setDate(result.getDate() + 1);
+                attempts++;
+            }
+        }
+        if(!satisfied) App.showAlert("No valid date was found to reschedule a detention for " + name + ".", "warning");
+        return result;
+    },
+    //Performs date validation (I.e: checks for conflict, valid weekday, etc.)
+    isValidDate: function(date, name) {
+        const formattedDate = App.formatDate(date);
+        let issueFound = false;
+        if(date.getDay() != 2 && date.getDay() != 3) issueFound = true;
+        const dateConflict = App.detentions.some(detention => {
+            if(detention.date) {
+                return (detention.date == formattedDate) && detention.name == name;
+            }
+            else if(detention.dateOne) {
+                return (detention.dateOne == formattedDate || detention.dateTwo == formattedDate) && detention.name == name;
+            }
+            return false;
+        });
+        if(dateConflict) issueFound = true;
+
+        if(issueFound) return false;
+        return true;
     }
 };
 
