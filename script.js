@@ -1265,3 +1265,132 @@ const profileViewerFunctions = {
 
 /*This object above with the various "badges" a student's record can earn
   is another example of the active DOM manipulation that this project made heavy use of.*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const attendanceFunctions = {
+    /*
+    verifyDetentionToday() - Checks if detentions are scheduled today and if
+    attendance hasn't been submitted yet (prevents duplicate submissions)
+    */
+    verifyDetentionToday: function() {
+        const formattedDate = App.getCentralDate();
+        let detentionsToday = false;
+        App.detentions.forEach((detention) => {
+            if(detention.dateOne && (detention.dateOne == formattedDate || detention.dateTwo == formattedDate)) detentionsToday = true;
+            if(detention.date && detention.date == formattedDate) detentionsToday = true; 
+        });
+
+        if(!detentionsToday) {
+            App.showAlert("There are no detentions scheduled for today.", "info");
+            return;
+        }
+        if(App.attendanceTaken == "t") {
+            App.showAlert("Today's attendance has already been submitted.", "info");
+            return
+        }
+        attendanceFunctions.loadAttendance()
+        UI.goTo("attendancescreen", "mainscreen")
+    },
+
+    /*
+    loadAttendance() - Builds attendance form showing all students with detention
+    today (handles both single date and double detention matches)
+    */
+    loadAttendance: function() {
+        const formattedDate = App.getCentralDate();
+        attendancescreen_dateLabel = `Detention on ${formattedDate} (${new Date(formattedDate).toLocaleDateString("en-US", { weekday: "long"})})`;
+        document.getElementById("attendancescreen_studentList").innerHTML = "";
+
+        let presentDetentions = App.detentions.filter((detention) => {
+            if(detention.dateOne && (detention.dateOne == formattedDate || detention.dateTwo == formattedDate)) return true;
+            if(detention.date && detention.date == formattedDate) return true;
+        });
+
+        presentDetentions.forEach((detention) => {
+            var newEntry = document.createElement("div");
+            newEntry.innerHTML = attendanceFunctions.createAttendanceHTML(detention);
+            newEntry.style.display = "flex";
+            newEntry.style.marginBottom = "8px";
+            newEntry.style.gap = "0px";
+            document.getElementById("attendancescreen_studentList").appendChild(newEntry);
+        });
+    },
+    //Returns a selection input (present, absent, late) for each student element in the attendance input.
+    createAttendanceHTML: function(detention) {
+        return `
+            <div style="border: 1px solid gray; border-top-left-radius: 5px; border-bottom-left-radius: 5px; width: 300px; padding: 8px;">${detention.name}</div>
+            <div style="border: 1px solid gray; border-top-right-radius: 5px; border-bottom-right-radius: 5px; width: 200px;"><select class="selectionBox" style="height: 40px; width: 200px; border: none;">
+                <option>Present</option>
+                <option>Absent</option>
+                <option>Late</option>
+            </select></div>
+        `;
+    },
+
+    /*
+    submitAttendance() - Records attendance status (Present/Absent/Late), updates
+    student profiles with missed/late arrays, marks attendance as taken, and logs
+    to reports.
+    */
+    submitAttendance: async function() {
+        const absentStudents = [];
+
+        App.attendanceTaken = "t";
+        const formattedDate = App.getCentralDate();
+        App.attendanceTakenDate = formattedDate;
+        const studentList = document.getElementById("attendancescreen_studentList");
+        const attendanceReport = [];
+
+        for(let i = 0; i < studentList.children.length; i++) {
+            const element = studentList.children[i];
+            const name = element.children[0].innerHTML;
+            const attendance = element.children[1].children[0].value;
+            if(attendance == "Absent") absentStudents.push(name);
+
+            App.studentProfiles.forEach((profile) => {
+                if(profile.name.toLowerCase() == name.toLowerCase()) {
+                    attendanceReport.push({name: profile.name, attendance: attendance});
+                    const profileIndex = App.studentProfiles.findIndex((profile) => profile.name.toLowerCase() == name.toLowerCase());
+                    if(attendance == "Absent") App.studentProfiles[profileIndex].detentionsMissed.push(App.attendanceTakenDate);
+                    if(attendance == "Late") App.studentProfiles[profileIndex].detentionsLate.push(App.attendanceTakenDate);
+                }
+            });
+        }
+
+        App.showAlert("Successfully submitted attendance. Please do not close tab.", "success");
+        UI.goTo("mainscreen", "attendancescreen");
+        App.fileReport("attendance", attendanceReport);
+        App.updateData(false);
+    }
+};
