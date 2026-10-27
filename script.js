@@ -285,7 +285,7 @@ const App = {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, "0");
         const day = String(date.getDate()).padStart(2, "0");
-        //condensed code sourced from AI - works reliably: used .padStart() and .getMonth() methods
+        //condensed formatting code: THIS CONCEPT WAS DERIVED FROM AI - works reliably: used .padStart() and .getMonth() methods
         return `${year}-${month}-${day}`;
     },
     //The getCentralDate method gets the current date as it is defined by UTC (Coordinated Universal Time) standards.
@@ -294,6 +294,7 @@ const App = {
         const centralYear = now.getUTCFullYear();
         const centralMonth = String(now.getUTCMonth() + 1).padStart(2, "0");
         const centralDay = String(now.getUTCDate()).padStart(2, "0");
+        //condensed formatting code: THIS CONCEPT WAS DERIVED FROM AI
         return `${centralYear}-${centralMonth}-${centralDay}`;
     },
     //The getDay method returns the current day of the week. This method is used throughout the app where needed.
@@ -309,9 +310,10 @@ const App = {
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const ampm = hours >= 12 ? "PM" : "AM";
         hours = hours % 12 || 12;
+        //condensed formatting code: THIS CONCEPT WAS DERIVED FROM AI
         return `${hours}:${minutes} ${ampm}`;
     },
-    //readData() - Fetches from all three data bins in parallel using Promise.all with an Array.map() function.
+    //readData() - Fetches from all three data bins in parallel using Promise.all with an Array.map() function. THIS CONCEPT WAS DERIVED FROM AI.
     readData: async function() {
         if(localStorage.stcd_authenticated != "true") return;
         await Promise.all(App.bins.map(async (bin) => {
@@ -783,7 +785,7 @@ const entryAdditionFunctions = {
     generateUniqueTag: function() {
         let tag;
         const existingTags = new Set(App.detentions.map(detention => detention.tag));
-        //Uses do / while statements to generate a tag that has no exact match in the database. Concept sourced from AI
+        //Uses do / while statements to generate a tag that has no exact match in the database. THIS CONCEPT WAS DERIVED FROM AI.
         do {
             tag = String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
         } 
@@ -1229,7 +1231,7 @@ const detentionListFunctions = {
             dateCell = `<div style="${baseStyle}">Date: ${detention.date} (${weekDay})</div>`;
         }
 
-        //Appends each component to each other to be returned
+        //Appends each component to each other to be returned. THIS CONCEPT WAS DERIVED FROM AI.
         return nameCell + yearCell + dateCell + tagCell;
     },
     //Adds a view button to the side of the division element
@@ -1940,6 +1942,8 @@ const attendanceFunctions = {
         const formattedDate = App.formatDate(date);
         let issueFound = false;
         if(date.getDay() != 3 && date.getDay() != 4) issueFound = true;
+        //Specific days changed for rescheduling logic (Wednesday and Thurday) based on detention coordinator feedback
+
         const dateConflict = App.detentions.some(detention => {
             if(detention.date) {
                 return (detention.date == formattedDate) && detention.name == name;
