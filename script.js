@@ -1052,18 +1052,22 @@ const profileFunctions = {
         }
         this.displayStudentList(matchingStudents, listContainer);
     },
+    //Finds matching student profiles based on entered the search term
     findMatchingStudents: function(searchTerm) {
         return App.studentProfiles.filter(profile => profile.name.toLowerCase().includes(searchTerm) && this.hasDetentions(profile));
     },
     hasDetentions: function(profile) {
-        return profile.fridayDetentions > 0;
+        return profile.detentions > 0 || profile.fridayDetentions > 0;
+        //Forgot to include profile.detentions > 0 check!
     },
+    //Displays search results - list of matching students added to the reference of a container element
     displayStudentList: function(students, container) {
         students.forEach(student => {
             container.appendChild(this.createStudentElement(student));
             container.appendChild(this.createDivider());
         });
     },
+    //Creates a dedicated search result elements that includes an onclick handler to bring the user to profile menu
     createStudentElement: function(student) {
         const element = document.createElement("h3");
         element.innerHTML = `${student.name} - ${student.year}`;
