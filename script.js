@@ -1089,3 +1089,179 @@ const profileFunctions = {
         `;
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const profileViewerFunctions = {
+    //viewStudentProfile() - Main entry point that orchestrates profile display
+    viewStudentProfile: function(element) {
+        if(UI.currentScreen == "fridaydetentionsneededscreen") UI.enteredFridayList = true;
+        const { studentName, yearGroup } = this.parseStudentInfo(element.innerHTML);
+        const profile = this.findStudentProfile(studentName, yearGroup);
+        if(!profile) {
+            App.showAlert("An unexpected error occured.", "error");
+            console.error(`Student profile not found: ${studentName} - ${yearGroup}`);
+            return;
+        }
+        this.displayProfileHeader(studentName, yearGroup, profile);
+        this.displayFridayDetentionWarning(studentName);
+        this.displayIncidentReport(studentName, yearGroup, profile);
+        this.displayBehaviorClassification(profile);
+        
+        UI.goTo("viewprofilescreen", UI.currentScreen);
+    },
+    parseStudentInfo: function(text) {
+        const [studentName, yearGroup] = text.split(" - ");
+        return { studentName, yearGroup };
+    },
+    findStudentProfile: function(name, year) {
+        return App.studentProfiles.find(profile => profile.name.toLowerCase() == name.toLowerCase() && profile.year == year);
+    },
+    //displayProfileHeader() - Shows detention counts (regular, Friday, missed, late)
+    displayProfileHeader: function(name, year, profile) {
+        viewprofilescreen_studentNameLabel.innerHTML = name;
+        viewprofilescreen_yearGroupLabel.innerHTML = year;
+        viewprofilescreen_detentionsLabel.innerHTML = `Detentions: ${profile.detentions}`;
+        viewprofilescreen_fridayDetentionsLabel.innerHTML = `Friday Detentions: ${profile.fridayDetentions}`;
+        viewprofilescreen_detentionsMissedLabel.innerHTML = `Detentions Missed: ${profile.detentionsMissed.length}`;
+        viewprofilescreen_detentionsLateLabel.innerHTML = `Detentions Late To: ${profile.detentionsLate.length}`;
+    },
+    displayFridayDetentionWarning: function(studentName) {
+        const needsFridayDetention = App.fridayDetentionsNeeded.some(entry => {
+            const name = entry.split(" - ")[0].toLowerCase();
+            return name == studentName.toLowerCase();
+        });
+        viewprofilescreen_fridayDetentionNeededLabel.innerHTML = needsFridayDetention ? "This student may be assigned a Friday detention." : "";
+    },
+
+    /*displayIncidentReport() - Lists all detention incidents with status badges:
+        * "Friday" for Friday detentions (red)
+        * "Absent" / "Late" markers for attendance issues (red)
+        * Handles single and double detentions differently
+    */
+    displayIncidentReport: function(studentName, yearGroup, profile) {
+        const container = viewprofilescreen_incidentReportList;
+        container.innerHTML = "";
+        const studentDetentions = this.getStudentDetentions(studentName, yearGroup);
+        
+        studentDetentions.forEach(detention => {
+            const incident = this.createIncidentElement(detention, profile);
+            container.appendChild(incident);
+            container.appendChild(this.createDivider());
+        });
+    },
+    getStudentDetentions: function(studentName, yearGroup) {
+        return App.detentions.filter(detention => 
+            detention.name.toLowerCase() == studentName.toLowerCase() && 
+            detention.year == yearGroup
+        );
+    },
+    createIncidentElement: function(detention, profile) {
+        const element = document.createElement("div");
+        element.style.textAlign = "left";
+        
+        let html = `${detention.reason} ${this.formatDetentionDate(detention)} `;
+        html += this.addRescheduledBadge(detention);
+        html += this.addFridayBadge(detention);
+        html += this.addAbsenceBadges(detention, profile);
+        html += this.addLateBadges(detention, profile);
+        
+        element.innerHTML = html;
+        return element;
+    },
+    formatDetentionDate: function(detention) {
+        if(detention.dateOne) return `<b>(${detention.dateOne} -- ${detention.dateTwo})</b> `;
+        return `<b>(${detention.date})</b>`;
+    },
+    addFridayBadge: function(detention) {
+        if(detention.date && new Date(detention.date).getDay() == 5) return "- <b style='color: red'>Friday</b> ";
+        return "";
+    },
+    addAbsenceBadges: function(detention, profile) {
+        if(detention.date) return profile.detentionsMissed.includes(detention.date) ? "- <b style='color: red'>Absent</b> " : "";
+        const missedDayOne = profile.detentionsMissed.includes(detention.dateOne);
+        const missedDayTwo = profile.detentionsMissed.includes(detention.dateTwo);
+        
+        if(missedDayOne && missedDayTwo) {
+            return "- <b style='color: red'>Absent Both Days</b> ";
+        } 
+        else if(missedDayOne) {
+            return "- <b style='color: red'>Absent Day One</b> ";
+        } 
+        else if(missedDayTwo) {
+            return "- <b style='color: red'>Absent Day Two</b> ";
+        }
+        return "";
+    },
+    addLateBadges: function(detention, profile) {
+        if(detention.date) return profile.detentionsLate.includes(detention.date) ? " - <b style='color: red'>Late</b>" : "";
+        const lateDayOne = profile.detentionsLate.includes(detention.dateOne);
+        const lateDayTwo = profile.detentionsLate.includes(detention.dateTwo);
+        
+        if(lateDayOne && lateDayTwo) {
+            return " - <b style='color: red'>Late Both Days</b>";
+        } 
+        else if(lateDayOne) {
+            return " - <b style='color: red'>Late Day One</b>";
+        }
+        else if(lateDayTwo) {
+            return " - <b style='color: red'>Late Day Two</b>";
+        }
+        return "";
+    },
+    addRescheduledBadge: function(detention) {
+        if(detention.notCounting) return " <b><i>Rescheduled</i></b>";
+        return "";
+    },
+    createDivider: function() {
+        const hr = document.createElement("hr");
+        hr.style.marginBottom = "12px";
+        return hr;
+    },
+    calculateBehaviorPoints: function(profile) {
+        return profile.detentions + profile.fridayDetentions + profile.detentionsMissed.length + profile.detentionsLate.length;
+    },
+    getBehaviorClassification: function(points) {
+        /*
+        displayBehaviorClassification() - Calculates behavior score from all incidents
+        and classifies as: Good (< or = 2) => Satisfactory => Medium => Bad => Very Bad => Terrible (>10)
+        */
+
+        if (points <= 2) return "Good";
+        if (points <= 4) return "Satisfactory";
+        if (points <= 6) return "Medium";
+        if (points <= 8) return "Bad";
+        if (points <= 10) return "Very Bad";
+        return "Terrible";
+    },
+    displayBehaviorClassification: function(profile) {
+        const points = this.calculateBehaviorPoints(profile);
+        const classification = this.getBehaviorClassification(points);
+        viewprofilescreen_behaviorLabel.innerHTML = `Behavior this year: ${classification}`;
+    }
+};
+
+/*This object above with the various "badges" a student's record can earn
+  is another example of the active DOM manipulation that this project made heavy use of.*/
