@@ -39,7 +39,27 @@ const UI = {
     },
     //The initEventListeners method adds all event listeners used throughout the app. This predominantly includes addstudentscreen menu elements.
     initEventListeners: function() {
-        
+        document.getElementById("addstudentscreen_singleDetentionRadio").addEventListener("change", function(e) {
+            if(addstudentscreen_singleDetentionRadio.checked) {
+                addstudentscreen_singleDetentionConfig.style.display = "block";
+                addstudentscreen_doubleDetentionConfig.style.display = "none";
+                addstudentscreen_fridayDetentionConfig.style.display = "none";
+            }
+        });
+        document.getElementById("addstudentscreen_doubleDetentionRadio").addEventListener("change", function(e) {
+            if(addstudentscreen_doubleDetentionRadio.checked) {
+                addstudentscreen_singleDetentionConfig.style.display = "none";
+                addstudentscreen_doubleDetentionConfig.style.display = "block";
+                addstudentscreen_fridayDetentionConfig.style.display = "none";
+            }
+        });
+        document.getElementById("addstudentscreen_fridayDetentionRadio").addEventListener("change", function(e) {
+            if(addstudentscreen_fridayDetentionRadio.checked) {
+                addstudentscreen_singleDetentionConfig.style.display = "none";
+                addstudentscreen_doubleDetentionConfig.style.display = "none";
+                addstudentscreen_fridayDetentionConfig.style.display = "block";
+            }
+        });
     }
 };
 
@@ -234,5 +254,256 @@ const App = {
             icon,
             confirmButtonText: "OK"
         });
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const entryAdditionFunctions = {
+    //The addDetentionEntry method initialises and manages the entire entry addition sequence.
+    addDetentionEntry: async function() {
+        const formData = this.getFormData("addstudentscreen");
+        const errors = this.validateDetentionEntry(formData);
+
+        //Errors are saved in an array, before handled appropriately in this if-else statement.
+        if(errors.length > 0) {
+            if(errors[0] == "This student already has a detention on this date." || errors[0] == "This student is already scheduled for detention on one of those dates.") {
+                const result = await Swal.fire({
+                    text: errors[0] + " Are you sure you want to continue?",
+                    icon: "info",
+                    showCancelButton: true,
+                    confirmButtonColor: "#3085d6",
+                    cancelButtonColor: "#d33",
+                    confirmButtonText: "Yes"
+                });
+                if(!result.isConfirmed) return;
+            }
+            else {
+                App.showAlert(errors[0], "warning");
+                return;
+            }
+        }
+
+        const entryObject = this.createDetentionEntry(formData);
+        App.detentions.push(entryObject);
+        UI.goTo("mainscreen", "addstudentscreen")
+        mainscreen_yearFilter.value = "All Years";
+        mainscreen_timeFilter.value = "All";
+
+        App.fileReport("addition", entryObject)
+        App.updateData(false);
+        App.showAlert("Successfully added student to detention.", "success");
+    },
+
+    //getFormData() - Extracts all form values from add student screen
+    getFormData: function(screen) {
+        if(screen == "addstudentscreen") {
+            const name = addstudentscreen_nameBox.value.trim();
+            const year = addstudentscreen_yearBox.value;
+            
+            let detentionType = null;
+            if(addstudentscreen_singleDetentionRadio.checked) detentionType = "single";
+            if(addstudentscreen_doubleDetentionRadio.checked) detentionType = "double";
+            if(addstudentscreen_fridayDetentionRadio.checked) detentionType = "friday";
+
+            const dates = {
+                single: addstudentscreen_singleDetentionDateBox.value,
+                doubleOne: addstudentscreen_doubleDetentionDateBoxOne.value,
+                doubleTwo: addstudentscreen_doubleDetentionDateBoxTwo.value,
+                friday: addstudentscreen_fridayDetentionDateBox.value
+            };
+
+            const reason = addstudentscreen_reasonBox.value == "Other" ? addstudentscreen_customReasonBox.value : addstudentscreen_reasonBox.value;
+            //Checks if the detention is configured as not counting toward a student's total.
+            const notCounting = addstudentscreen_countingCheckbox.checked;
+
+            return { name, year, detentionType, dates, reason };
+        }
+    },
+    //validateDetentionEntry() - Performs comprehensive validation checks using various other methods.
+    validateDetentionEntry: function(formData) {
+        const errors = [];
+        const { name, year, detentionType, dates, reason } = formData;
+
+        if(name.length < 1) errors.push("Please enter a valid student name.");
+        if(name.includes("-")) errors.push("Invalid character '-' in student name.");
+        if(year == "-- Select Year Group --") errors.push("Please select a year group.");
+
+        if(detentionType == "single") this.validateSingleDetention(name, dates.single, errors);
+        if(detentionType == "double") this.validateDoubleDetention(name, dates.doubleOne, dates.doubleTwo, errors);
+        if(detentionType == "friday") this.validateFridayDetention(name, dates.friday, errors);
+
+        if(reason.length < 1) errors.push("Please enter a reason for detention.");
+        return errors;
+    },
+    //The validateSingleDetention method performs all the necessary checks to avoid scheduling issues.
+    validateSingleDetention: async function(name, date, errors) {
+        if(!date) {
+            errors.push("Please select a date for detention.");
+            return;
+        }
+        if(!this.isValidWeekday(date)) {
+            errors.push("Please select a valid weekday (Monday-Thursday) for detention.");
+            return;
+        }
+        if(this.hasDetentionConflict(name, [date])) {
+            errors.push("This student already has a detention on this date.");
+            return;
+        }
+
+        let detentionQuantity = 0;
+        App.detentions.forEach((detention) => {
+            if(detention.date == date || detention.dateTwo == date || detention.dateOne == date) detentionQuantity++;
+        });
+        if(detentionQuantity > 20) {
+            errors.push("Detention on " + date + " has reached the maximum capacity of twenty entries.");
+            return;
+        }
+    },
+    //The validateDoubleDetention method performs all the necessary checks to avoid scheduling issues for both detention dates.
+    validateDoubleDetention: async function(name, dateOne, dateTwo, errors) {
+        if(!dateOne || !dateTwo) {
+            errors.push("Please select both dates for detention.");
+            return;
+        }
+        if(dateTwo <= dateOne) {
+            errors.push("The second date must come after the first date.");
+            return;
+        }
+        if(!this.isValidWeekday(dateOne) || !this.isValidWeekday(dateTwo)) {
+            errors.push("Please select valid weekdays for both detentions.");
+            return;
+        }
+        if(this.hasDetentionConflict(name, [dateOne, dateTwo])) {
+            errors.push("This student is already scheduled for detention on one of those dates.");
+            return;
+        }
+
+        let detentionQuantityOne = 0;
+        let detentionQuantityTwo = 0;
+        App.detentions.forEach((detention) => {
+            if(detention.dateOne == dateOne || detention.dateTwo == dateOne || detention.date == dateOne) detentionQuantityOne++;
+            if(detention.dateTwo == dateOne || detention.dateTwo == dateTwo || detention.date == dateTwo) detentionQuantityTwo++;
+        });
+
+        if(detentionQuantityOne > 20) {
+            errors.push("Detention on " + dateOne + " has reached the maximum capacity of twenty entries.");
+            return;
+        }
+        if(detentionQuantityTwo > 20) {
+            errors.push("Detention on " + dateTwo + " has reached the maximum capacity of twenty entries.");
+            return;
+        }
+    },
+    //The validateFridayDetention method performs all the necessary checks to avoid scheduling issues for after-school detentions.
+    validateFridayDetention: async function(name, date, errors) {
+        if(!date) {
+            errors.push("Please select a date for detention.");
+            return;
+        }
+        if(new Date(date).getDay() != 5) {
+            errors.push("Please select a Friday for detention.");
+            return;
+        }
+        if(this.hasDetentionConflict(name, [date])) {
+            errors.push("This student already has a detention on this date.");
+            return;
+        }
+
+        let detentionQuantity = 0;
+        App.detentions.forEach((detention) => {
+            if(detention.date == date || detention.dateOne == date || detention.dateTwo == date) detentionQuantity++;
+        });
+
+        //For Friday detentions, there can be up to fourty entries schedules at once, unlike the usual cap of twenty.
+        if(detentionQuantity > 40) {
+            errors.push("Detention on " + date + " has reached the maximum capacity forty entries.");
+            return;
+        }
+    },
+    //This helper method checks if the supplied date in the format yyyy-mm-dd is a valid weekday (Mon-Thu) for detentions that are not on Fridays.
+    isValidWeekday: function(formattedDate) {
+        const day = new Date(formattedDate).getDay();
+        return day >= 1 && day <= 4;
+    },
+    //This specific method checks if a specific student has a scheduled detention within a specified set of dates. Works to check if scheduling conflicts exist.
+    hasDetentionConflict: function(name, datesToCheck) {
+        const loweredName = name.toLowerCase();
+        var conflictDetected = false;
+        datesToCheck.forEach((dateToCheck) => {
+            for(let i = 0; i < App.detentions.length; i++) {
+                if(App.detentions[i].name.toLowerCase() == loweredName) {
+                    if(App.detentions[i].hasOwnProperty("dateOne")) {
+                        if(App.detentions[i].dateTwo == dateToCheck || App.detentions[i].dateTwo == dateToCheck) conflictDetected = true;
+                    }
+                    else {
+                        if(App.detentions[i].date == dateToCheck) conflictDetected = true;
+                    }
+                }
+            }
+        });
+        return conflictDetected;
+    },
+    //createDetentionEntry() - Constructs detention object with metadata such as scheduling teacher and date and time of addition.
+    createDetentionEntry: function(formData) {
+        const { name, year, detentionType, dates, reason } = formData;
+        const tag = this.generateUniqueTag();
+        const baseEntry = {
+            name,
+            year,
+            reason,
+            tag,
+        };
+
+        //The baseEntry specified above is copied using "..." notation, and the date properties are assigned based on detention type for the completed entry object.
+        if(detentionType == "single") return { ...baseEntry, date: dates.single };
+        if(detentionType == "double") return { ...baseEntry, dateOne: dates.doubleOne, dateTwo: dates.doubleTwo };
+        if(detentionType == "friday") return { ...baseEntry, date: dates.friday };
+    },
+    //generateUniqueTag() - Creates collision-free 8-digit identifier
+    generateUniqueTag: function() {
+        let tag;
+        const existingTags = new Set(App.detentions.map(detention => detention.tag));
+        //Uses do / while statements to generate a tag that has no exact match in the database.
+        do {
+            tag = String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
+        } 
+        while(existingTags.has(tag));
+        return tag;
     }
 };
