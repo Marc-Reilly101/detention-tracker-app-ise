@@ -469,7 +469,8 @@ const entryAdditionFunctions = {
             for(let i = 0; i < App.detentions.length; i++) {
                 if(App.detentions[i].name.toLowerCase() == loweredName) {
                     if(App.detentions[i].hasOwnProperty("dateOne")) {
-                        if(App.detentions[i].dateTwo == dateToCheck || App.detentions[i].dateTwo == dateToCheck) conflictDetected = true;
+                        if(App.detentions[i].dateOne == dateToCheck || App.detentions[i].dateTwo == dateToCheck) conflictDetected = true;
+                        //Fixed duplicate dateTwo checks instead of dateOne. Lovely headache.
                     }
                     else {
                         if(App.detentions[i].date == dateToCheck) conflictDetected = true;
