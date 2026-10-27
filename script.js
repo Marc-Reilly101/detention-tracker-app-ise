@@ -86,6 +86,7 @@ const App = {
         await this.readData();
         if(this.fetchError) return;
         await this.checkData();
+        fridayDetentionFunctions.checkFridayDetentions();
         UI.initEventListeners()
         UI.updateLoading("none")
     },
@@ -217,6 +218,7 @@ const App = {
     updateData: async function(wait = true) {
         if(wait) UI.updateLoading("busy")
         //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
+        fridayDetentionFunctions.checkFridayDetentions();
         await Promise.all([
             App.writeData(0),
             App.writeData(1),
@@ -589,3 +591,66 @@ const entryRemovalFunctions = {
         await App.updateData(false);
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const fridayDetentionFunctions = {
+    /*
+    initNeededFridayDetentionsScreen() - Renders clickable list of students
+    who qualify but haven't been scheduled yet
+    */
+    initNeededFridayDetentionsScreen: function() {
+        fridaydetentionsneededscreen_studentList.innerHTML = "";
+        for(let i = 0; i < App.fridayDetentionsNeeded.length; i++) {
+            var newProfile = document.createElement("h3");
+            newProfile.innerHTML = App.fridayDetentionsNeeded[i];
+            newProfile.className = "underline-hover";
+            newProfile.onclick = function() { 
+                profileViewerFunctions.viewStudentProfile(this); 
+            };
+            document.getElementById("fridaydetentionsneededscreen_studentList").appendChild(newProfile);
+
+            var horizontalRuling = document.createElement("hr");
+            horizontalRuling.style.marginBottom = "12px";
+            document.getElementById("fridaydetentionsneededscreen_studentList").appendChild(horizontalRuling);
+        }
+    },
+
+    /*
+    checkFridayDetentions() - Calculates which students need Friday detention
+    (detentions ÷ 3 > fridayDetentions already scheduled)
+    */
+    checkFridayDetentions: function() {
+        mainscreen_fridayDetentionNotice.style.display = "none";
+        App.fridayDetentionsNeeded = [];
+        for(let i = 0; i < App.studentProfiles.length; i++) {
+            if(Math.floor(App.studentProfiles[i].detentions / 3) > App.studentProfiles[i].fridayDetentions) App.fridayDetentionsNeeded.push(App.studentProfiles[i].name + " - " + App.studentProfiles[i].year);
+        }
+        //Displays notification banner on main screen when students need scheduling.
+        mainscreen_fridayDetentionNotice.innerHTML = "There are " + App.fridayDetentionsNeeded.length + " Friday detention(s) in need of scheduling.";
+        if(App.fridayDetentionsNeeded.length > 0) mainscreen_fridayDetentionNotice.style.display = "block";
+    }
+};
+
+//It's a bit bare-bones, but for this use-case, it works perfectly fine.

@@ -245,5 +245,32 @@
         </div>
 
 
+        <div id="attendancescreen" class="hidden">
+            <div class="header"> <b class="underline-hover" onclick="UI.goTo('mainscreen', 'attendancescreen')">Back</b> </div>
+            <div class="webcontent">
+                <h2>Today's Attendance</h2>
+                <i id="attendancescreen_dateLabel"></i> </p>
+                <hr/>
+                <div id="attendancescreen_studentList"></div>
+                <button class="button" onclick="attendanceFunctions.submitAttendance()">Submit</button>
+            </div>
+        </div>
+
+
+
+
+        <div id="fridaydetentionsneededscreen" class="hidden">
+            <div class="header"> <b class="underline-hover" onclick="UI.goTo('mainscreen', 'fridaydetentionsneededscreen')">Back</b> </div>
+            <div class="webcontent">
+                <h2>Schedule Friday Detentions</h2>
+                <hr/>
+                <div id="fridaydetentionsneededscreen_studentList"></div>
+            </div>
+        </div>
+
+
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="app.js"></script>
+    <script src="script.js"></script>
 </body>
