@@ -55,6 +55,22 @@ const UI = {
     },
     //The initEventListeners method adds all event listeners used throughout the app. This predominantly includes addstudentscreen menu elements.
     initEventListeners: function() {
+        //This first event listener tackles the re-focus check as a measure to prevent stale sessions.
+        document.addEventListener("visibilitychange", () => {
+            if(document.hidden) {
+                App.lastHiddenTime = Date.now();
+            } 
+            else {
+                if(App.lastHiddenTime && Date.now() - App.lastHiddenTime > App.timeout) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Session expired",
+                        text: "Please refresh the page.",
+                        confirmButtonText: "Refresh"
+                    }).then(() => {location.reload()});
+                }
+            }
+        });
 
         document.getElementById("mainscreen_yearFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
         document.getElementById("mainscreen_timeFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
