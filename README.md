@@ -4,6 +4,7 @@
 ---
 The Detention Tracker Application is a web service designed to record and keep track of detentions in a school environment. It is a deployed service actively used by nine administrators.
 The purpose of this README is to provide additional architectural details of the app's codebase.<br>
+[See the live deployed application here (not production version)](https://detention-tracker-ul.netlify.app/)<br>
 *The password is: ise2027*
 
 ### Note on Repository
