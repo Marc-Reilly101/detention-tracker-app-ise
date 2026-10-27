@@ -41,7 +41,9 @@ const UI = {
             addstudentscreen_reasonBox.value = "Phone not in Pouch";
             addstudentscreen_customReasonConfig.style.display = "none";
             addstudentscreen_customReasonBox.value = "";
-            //Teacher options were not added at this stage
+            addstudentscreen_teacherBox.value = "-- Scheduled By --";
+            addstudentscreen_otherTeacherConfig.style.display = "none";
+            addstudentscreen_otherTeacherBox.value = "";
         }
         if(screen == "profilesearchscreen") {
             profilesearchscreen_searchBox.value = "";
@@ -129,6 +131,13 @@ const UI = {
             });
             //Add autocomplete-items class to relevant elements to add appropriate styling.
             if(list.innerHTML != "") list.setAttribute("class", "autocomplete-items");
+        });
+
+        document.getElementById("addstudentscreen_reasonBox").addEventListener("change", function(e) {
+            addstudentscreen_reasonBox.value == "Other" ? addstudentscreen_customReasonConfig.style.display = "block" : addstudentscreen_customReasonConfig.style.display = "none";
+        });
+        document.getElementById("addstudentscreen_teacherBox").addEventListener("change", function(e) {
+            addstudentscreen_teacherBox.value == "Other" ? addstudentscreen_otherTeacherConfig.style.display = "block" : addstudentscreen_otherTeacherConfig.style.display = "none";
         });
 
         //This particular event listener keeps track of when a user clicks outside of auto-complete elements as an intuitive way to close the menu.
@@ -455,16 +464,18 @@ const entryAdditionFunctions = {
             };
 
             const reason = addstudentscreen_reasonBox.value == "Other" ? addstudentscreen_customReasonBox.value : addstudentscreen_reasonBox.value;
+            const teacher = addstudentscreen_teacherBox.value == "Other" ? addstudentscreen_otherTeacherBox.value : addstudentscreen_teacherBox.value;
+
             //Checks if the detention is configured as not counting toward a student's total.
             const notCounting = addstudentscreen_countingCheckbox.checked;
-
-            return { name, year, detentionType, dates, reason };
+            //Teacher now included as well as notCounting box for rescheduling purposes (see rescheduling commit)
+            return { name, year, detentionType, dates, reason, teacher, notCounting };
         }
     },
     //validateDetentionEntry() - Performs comprehensive validation checks using various other methods.
     validateDetentionEntry: function(formData) {
         const errors = [];
-        const { name, year, detentionType, dates, reason } = formData;
+        const { name, year, detentionType, dates, reason, teacher, notCounting } = formData;
 
         if(name.length < 1) errors.push("Please enter a valid student name.");
         if(name.includes("-")) errors.push("Invalid character '-' in student name.");
@@ -475,6 +486,7 @@ const entryAdditionFunctions = {
         if(detentionType == "friday") this.validateFridayDetention(name, dates.friday, errors);
 
         if(reason.length < 1) errors.push("Please enter a reason for detention.");
+        if(teacher.length < 1 || teacher == "-- Scheduled By --") errors.push("Please enter your name.");
         return errors;
     },
     //The validateSingleDetention method performs all the necessary checks to avoid scheduling issues.
@@ -588,13 +600,23 @@ const entryAdditionFunctions = {
     },
     //createDetentionEntry() - Constructs detention object with metadata such as scheduling teacher and date and time of addition.
     createDetentionEntry: function(formData) {
-        const { name, year, detentionType, dates, reason } = formData;
+        const { name, year, detentionType, dates, reason, teacher, notCounting } = formData;
         const tag = this.generateUniqueTag();
+        const currentDate = App.getCentralDate();
+        const currentTime = App.getCurrentTimeString();
+
+        //Updated data architecture to include data sub-object (referred to mainly as metadata in main report)
         const baseEntry = {
             name,
             year,
             reason,
+            data: {
+                teacher,
+                date: currentDate,
+                time: currentTime
+            },
             tag,
+            notCounting
         };
 
         //The baseEntry specified above is copied using "..." notation, and the date properties are assigned based on detention type for the completed entry object.
@@ -1023,6 +1045,12 @@ const viewEntryFunctions = {
         const date = new Date(dateString);
         return date.toLocaleDateString("en-US", { weekday: "long" });
     },
+    //handles how metadata is displayed to the user. If no metadata is detected, ther user is notified that no scheduling data exists.
+    formatTeacherInfo: function(detention) {
+        if(!detention.data) return "No Scheduling Data";
+        const { teacher, date, time } = detention.data;
+        return `Detention Added By ${teacher} on ${date} -- ${time}`;
+    },
     exitEntryScreen: function() {
         UI.goTo(this.viewingFrom, "viewentryscreen")
     }
@@ -1232,6 +1260,7 @@ const profileViewerFunctions = {
     },
 
     /*displayIncidentReport() - Lists all detention incidents with status badges:
+        * Teacher name in brackets
         * "Friday" for Friday detentions (red)
         * "Absent" / "Late" markers for attendance issues (red)
         * Handles single and double detentions differently
@@ -1258,6 +1287,7 @@ const profileViewerFunctions = {
         element.style.textAlign = "left";
         
         let html = `${detention.reason} ${this.formatDetentionDate(detention)} `;
+        html += this.addTeacherBadge(detention);
         html += this.addRescheduledBadge(detention);
         html += this.addFridayBadge(detention);
         html += this.addAbsenceBadges(detention, profile);
@@ -1265,6 +1295,10 @@ const profileViewerFunctions = {
         
         element.innerHTML = html;
         return element;
+    },
+    addTeacherBadge: function(detention) {
+        if(!detention.data) return "";
+        return `<b>[${detention.data.teacher}]</b> `;
     },
     formatDetentionDate: function(detention) {
         if(detention.dateOne) return `<b>(${detention.dateOne} -- ${detention.dateTwo})</b> `;
