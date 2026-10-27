@@ -867,6 +867,13 @@ const viewEntryFunctions = {
         const entryTag = viewEntryFunctions.extractTagFromContainer(container);
         const detentionEntry = viewEntryFunctions.findDetentionByTag(App.detentions, entryTag);
         
+        //This should never happen, but if something goes wrong, and a hidden element is not populated with the entry's tag, the method will stop.
+        if(!detentionEntry) {
+            App.showAlert("An unexpected error occured while viewing detention entry.", "warning");
+            console.error(`No detention found with tag: ${entryTag}`);
+            return;
+        }
+
         viewEntryFunctions.displayDetentionDetails(detentionEntry);
         UI.goTo("viewentryscreen", UI.currentScreen);
     },
