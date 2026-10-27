@@ -79,6 +79,10 @@ const UI = {
                 addstudentscreen_fridayDetentionConfig.style.display = "block";
             }
         });
+
+        document.getElementById("profilesearchscreen_searchBox").addEventListener("change", function(e) {
+            profileFunctions.searchProfiles();
+        });
     }
 };
 
@@ -105,6 +109,7 @@ const App = {
         await this.readData();
         if(this.fetchError) return;
         await this.checkData();
+        profileFunctions.syncProfiles();
         fridayDetentionFunctions.checkFridayDetentions();
         UI.initEventListeners()
         detentionListFunctions.loadDetentionList();
@@ -237,9 +242,11 @@ const App = {
     //updateData() - Coordinates full system update across all bins
     updateData: async function(wait = true) {
         if(wait) UI.updateLoading("busy")
-        //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
+        profileFunctions.syncProfiles();
         detentionListFunctions.loadDetentionList()
         fridayDetentionFunctions.checkFridayDetentions();
+
+        //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
         await Promise.all([
             App.writeData(0),
             App.writeData(1),
@@ -344,6 +351,7 @@ const entryAdditionFunctions = {
 
         const entryObject = this.createDetentionEntry(formData);
         App.detentions.push(entryObject);
+        profileFunctions.updateOrCreateStudentProfile(formData.name, formData.year);
         UI.goTo("mainscreen", "addstudentscreen")
         mainscreen_yearFilter.value = "All Years";
         mainscreen_timeFilter.value = "All";
@@ -942,5 +950,138 @@ const viewEntryFunctions = {
     },
     exitEntryScreen: function() {
         UI.goTo(this.viewingFrom, "viewentryscreen")
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const profileFunctions = {
+    //updateOrCreateStudentProfile() - Creates new profile if student doesn't exist
+    updateOrCreateStudentProfile: function(name, year) {
+        const profileIndex = App.studentProfiles.findIndex(profile => profile.name.toLowerCase() == name.toLowerCase() && profile.year == year);
+        if(profileIndex == -1) {
+            App.studentProfiles.push({
+                name,
+                year,
+                detentions: 0,
+                fridayDetentions: 0,
+                detentionsMissed: [],
+                detentionsLate: []
+            });
+        }
+    },
+    syncProfiles: function() {
+        /*
+            syncProfiles() - Recalculates detention counts by scanning all detention entries,
+            distinguishes between regular (Mon-Thu) and Friday detentions, and cleans up
+            stale attendance records (missed / late) for deleted detentions
+        */
+        for(let i = 0; i < App.studentProfiles.length; i++) {
+            var profileIndex = i;
+            var studentName = App.studentProfiles[profileIndex].name.toLowerCase();
+            var yearGroup = App.studentProfiles[profileIndex].year;
+            var foundProfileDetentions = [];
+            var foundProfileFridayDetentions = [];
+            App.studentProfiles[profileIndex].detentions = 0;
+            App.studentProfiles[profileIndex].fridayDetentions = 0;
+
+            for(let j = 0; j < App.detentions.length; j++) {
+                if(App.detentions[j].name.toLowerCase() == studentName && App.detentions[j].year == yearGroup) {
+                    if(!App.detentions[j].hasOwnProperty("notCounting") || (App.detentions[j].hasOwnProperty("notCounting") && App.detentions[j].notCounting == false)) {
+                        if(App.detentions[j].hasOwnProperty("dateOne")) {
+                            foundProfileDetentions.push(App.detentions[j].dateOne);
+                            foundProfileDetentions.push(App.detentions[j].dateTwo);
+                        }
+                        if(App.detentions[j].hasOwnProperty("date") && new Date(App.detentions[j].date).getDay() != 5) foundProfileDetentions.push(App.detentions[j].date);
+                        if(App.detentions[j].hasOwnProperty("date") && new Date(App.detentions[j].date).getDay() == 5) foundProfileFridayDetentions.push(App.detentions[j].date);
+                    }
+                }
+            }
+            App.studentProfiles[profileIndex].detentions = foundProfileDetentions.length;
+            App.studentProfiles[profileIndex].fridayDetentions = foundProfileFridayDetentions.length;
+
+            var removingAbsentDates = [];
+            var removingLateDates = [];
+            App.studentProfiles[profileIndex].detentionsMissed.forEach((date) => {
+                if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingAbsentDates.push(date);
+            });
+            App.studentProfiles[profileIndex].detentionsLate.forEach((date) => {
+                if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingLateDates.push(date);
+            });
+
+            removingAbsentDates.forEach((date) => {
+                var dateIndex = App.studentProfiles[profileIndex].detentionsMissed.indexOf(date);
+                App.studentProfiles[profileIndex].detentionsMissed.splice(dateIndex, 1);
+            });
+            removingLateDates.forEach((date) => {
+                var dateIndex = App.studentProfiles[profileIndex].detentionsMissed.indexOf(date);
+                App.studentProfiles[profileIndex].detentionsMissed.splice(dateIndex, 1);
+            });
+        }
+        var validProfiles = App.studentProfiles.filter((profile) => profile.detentions > 0 || profile.fridayDetentions > 0);
+        App.studentProfiles = validProfiles;
+    },
+
+    /*
+    searchProfiles() - Filters and displays students by name, only showing those
+    with at least one detention on record
+    */
+    searchProfiles: function() {
+        const searchTerm = profilesearchscreen_searchBox.value.trim().toLowerCase();
+        const listContainer = document.getElementById("profilesearchscreen_profileList");
+        listContainer.innerHTML = "";
+        if(searchTerm.length == 0) return;
+        const matchingStudents = this.findMatchingStudents(searchTerm);
+        if(matchingStudents.length == 0) {
+            this.displayNoResults(listContainer);
+            return;
+        }
+        this.displayStudentList(matchingStudents, listContainer);
+    },
+    findMatchingStudents: function(searchTerm) {
+        return App.studentProfiles.filter(profile => profile.name.toLowerCase().includes(searchTerm) && this.hasDetentions(profile));
+    },
+    hasDetentions: function(profile) {
+        return profile.fridayDetentions > 0;
+    },
+    displayStudentList: function(students, container) {
+        students.forEach(student => {
+            container.appendChild(this.createStudentElement(student));
+            container.appendChild(this.createDivider());
+        });
+    },
+    createStudentElement: function(student) {
+        const element = document.createElement("h3");
+        element.innerHTML = `${student.name} - ${student.year}`;
+        element.className = "underline-hover";
+        element.onclick = function() { 
+            profileViewerFunctions.viewStudentProfile(this); 
+        };
+        return element;
+    },
+    createDivider: function() {
+        const hr = document.createElement("hr");
+        hr.style.marginBottom = "12px";
+        return hr;
+    },
+    displayNoResults: function(container) {
+        container.innerHTML = `
+            <i>No Results</i>
+            <h6><i>Note: Only students that have received a detention this year will appear here.</i></h6>
+        `;
     }
 };
