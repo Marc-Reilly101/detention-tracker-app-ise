@@ -131,6 +131,9 @@ const UI = {
 
 const App = {
     fetchError: false,
+    staleVersionError: false,
+    lastHiddenTime: null,
+    timeout: 210000,
     detentions: [],
     studentProfiles: [],
     reports: [],
@@ -196,6 +199,13 @@ const App = {
                 /*If the response is not successful, as indicated by response.ok, an error is thrown to the console. This usually 
                   suggests network issues (caused by loss of wifi, or service outages).
                 */
+                const version = response.headers.get("X-Version");
+                //this extracts the version identifier from the dataset for concurrency control.
+
+                if(bin == "detentions") localStorage.stcd_detentionsVersion = version;
+                if(bin == "studentProfiles") localStorage.stcd_profilesVersion = version;
+                if(bin == "reports") localStorage.stcd_reportsVersion = version;
+                //assigns each local storage key its corresponding bin's version identifier.
 
                 const data = await response.json();
                 const responseData = data.record;
@@ -244,19 +254,21 @@ const App = {
     },
     //writeData() - Persists changes back to specific bin with version checking
     writeData: async function(binIndex) {
-        if(App.fetchError) return;
+        if(localStorage.stcd_authenticated != "true") return;
+        if(App.fetchError || App.staleVersionError) return;
 
         //Three "bin configs" are initialised here, specifying what data needs to be written, and in what format. It is done so with stored callback functions.
         const binConfigs = [
-            {data: () => ({detentions: App.detentions, attendanceData: [App.attendanceTaken, App.attendanceTakenDate]})},
-            {data: () => ({studentProfiles: App.studentProfiles})},
-            {data: () => App.reports.length > 0 ? {reports: App.reports} : null}
+            {data: () => ({detentions: App.detentions, attendanceData: [App.attendanceTaken, App.attendanceTakenDate]}), versionKey: "stcd_detentionsVersion"},
+            {data: () => ({studentProfiles: App.studentProfiles}), versionKey: "stcd_profilesVersion"},
+            {data: () => App.reports.length > 0 ? {reports: App.reports} : null, versionKey: "stcd_reportsVersion"}
         ];
         const config = binConfigs[binIndex];
         if(!config) return;
         
         const dataObject = config.data();
         if(!dataObject) return;
+        const version = localStorage[config.versionKey] || "0";
         const binName = App.bins[binIndex];
 
         try {
@@ -266,7 +278,18 @@ const App = {
                 headers: {"Content-Type": "application/json", "X-Version": version},
                 body: JSON.stringify(dataObject)
             });
+            if(response.status == 409 && !App.staleVersionError) {
+                App.staleVersionError = true;
+                await Swal.fire({ 
+                    text: "Data was updated elsewhere. Please refresh to get the latest version before saving again.", 
+                    icon: "warning", 
+                    confirmButtonText: "OK" 
+                }).then(() => location.reload());
+                return;
+            }
             if(!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            const newVersion = response.headers.get("X-Version");
+            if(newVersion) localStorage[config.versionKey] = newVersion;
             const data = await response.json();
             console.log(`Successfully updated bin: ${binName}`, data);
         } 
