@@ -193,6 +193,39 @@ const App = {
             if(!App.staleVersionError) App.showAlert("An error occured while writing data - your changes have not saved. Please check your internet connection and refresh this page.", "error");
         }
     },
+    //updateData() - Coordinates full system update across all bins
+    updateData: async function(wait = true) {
+        if(wait) UI.updateLoading("busy")
+        //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
+        await Promise.all([
+            App.writeData(0),
+            App.writeData(1),
+            App.writeData(2)
+        ]);
+        UI.updateLoading("none");
+    },
+    //The fileReport method accepts a type and "changeData" argument that specifies what data needs to be logged, and what bin / action it is relevant to.
+    fileReport: function(type, changeData) {
+        const currentDate = App.getCentralDate();
+        const currentTime = App.getCurrentTimeString();
+        const formatDateRange = (data) => data.dateOne ? `${data.dateOne} -- ${data.dateTwo}` : data.date;
+        const formatEntry = (data) => `[Name: ${data.name}, Year: ${data.year}, Date(s): ${formatDateRange(data)}, Reason: ${data.reason}]`;
+        const logReport = (message) => App.reports.push(`${message} on ${currentDate} at ${currentTime}`);
+
+        //switch statement :D, experiment from python match/case statement.
+        switch(type) {
+            case "addition":
+                logReport(`USER: ${changeData.data.teacher} - ADDED ENTRY: ${formatEntry(changeData)}`);
+                break;
+            case "removal":
+                logReport(`USER - REMOVED ENTRY: ${formatEntry(changeData)}`);
+                break;
+            case "attendance":
+                const attendanceList = changeData.map(data => `(${data.name} - ${data.attendance})`).join("");
+                logReport(`USER - SUBMITTED ATTENDANCE: [${attendanceList}]`);
+                break;
+        }
+    },
     //The showAlert method serves as a centralised way to show standard dialogue boxes using the SweetAlert2 API. 
     //Other dialogue options such as prompts or confirmations are not handled by this method
     showAlert: function(text, icon) {
