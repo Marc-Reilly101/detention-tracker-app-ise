@@ -217,7 +217,7 @@
                 <div id="profilesearchscreen_profileList"></div>
             </div>
         </div>
-
+        
         <div id="viewprofilescreen" class="hidden">
             <div class="header"> <b class="underline-hover" onclick="UI.goTo('profilesearchscreen', 'viewprofilescreen')">Back</b> </div>
             <div class="webcontent centered">
@@ -231,6 +231,16 @@
                 <p id="viewprofilescreen_detentionsMissedLabel"></p>
                 <p id="viewprofilescreen_detentionsLateLabel"></p>
                 <!-- user-specific statistics tracking total detention count, absences and late detentions -->
+
+                <hr/>
+                <div class="container" id="viewprofilescreen_incidentContainer" style="width: 600px;">
+                    <b><u>Incident Reports:</u></b> </p>
+                    <div id="viewprofilescreen_incidentReportList"></div>
+                </div>
+                <h3 id="viewprofilescreen_behaviorLabel"></h3> </p>
+                <!-- added incident lists to make tracking a student's history easier for Year Heads. Also includes a behavior indicator, which
+                 displays a "good," "bad," "moderate," "terrible," etc, based on detention count, absences, etc. -->
+                 
             </div>
         </div>
 
