@@ -1,3 +1,23 @@
+/*
+    UI Manager Module
+
+    Handles all user interface management and screen navigation for the application.
+    This module manages screen transitions, form resets, loading states, and event listener initialisation.
+
+    Key responsibilities:
+    - Screen navigation with automatic form cleanup.
+    - Autocomplete functionality for student name input.
+    - Session timeout monitoring when app is hidden.
+    - Filter change listeners for detention lists.
+    - Dynamic form configuration based on detention type selection.
+
+    Special navigation:
+    - Automatically resets forms when leaving add / search screens.
+    - Redirects to Friday detentions list when exiting a profile viewed from that context.
+    - Tracks the origin screen for entry viewing to enable proper back navigation.
+*/
+
+
 const UI = {
     currentScreen: "passwordscreen",
     enteredFridayList: false,
@@ -24,6 +44,7 @@ const UI = {
     updateLoading: function(status) {
         status == "busy" ? this.goTo("loadingscreen", this.currentScreen) : this.goTo(this.currentScreen, "loadingscreen");
     },
+    //Resets form fields for major input-heavy menus such as addstudentscreen
     resetScreen: function(screen) {
         if(screen == "addstudentscreen") {
             addstudentscreen_nameBox.value = "";
@@ -101,10 +122,6 @@ const UI = {
             }
         });
 
-        document.getElementById("profilesearchscreen_searchBox").addEventListener("change", function(e) {
-            profileFunctions.searchProfiles();
-        });
-
         document.getElementById("addstudentscreen_nameBox").addEventListener("input", function() {
             const enteredValue = this.value.toLowerCase();
             UI.closeNamePredictionSuggestions();
@@ -133,16 +150,19 @@ const UI = {
             if(list.innerHTML != "") list.setAttribute("class", "autocomplete-items");
         });
 
+        //This particular event listener keeps track of when a user clicks outside of auto-complete elements as an intuitive way to close the menu.
+        document.addEventListener("click", function(e) {
+            if(e.target != document.getElementById("addstudentscreen_nameBox") && UI.currentScreen == "addstudentscreen") UI.closeNamePredictionSuggestions();
+        });
+
         document.getElementById("addstudentscreen_reasonBox").addEventListener("change", function(e) {
             addstudentscreen_reasonBox.value == "Other" ? addstudentscreen_customReasonConfig.style.display = "block" : addstudentscreen_customReasonConfig.style.display = "none";
         });
         document.getElementById("addstudentscreen_teacherBox").addEventListener("change", function(e) {
             addstudentscreen_teacherBox.value == "Other" ? addstudentscreen_otherTeacherConfig.style.display = "block" : addstudentscreen_otherTeacherConfig.style.display = "none";
         });
-
-        //This particular event listener keeps track of when a user clicks outside of auto-complete elements as an intuitive way to close the menu.
-        document.addEventListener("click", function(e) {
-            if(e.target != document.getElementById("addstudentscreen_nameBox") && UI.currentScreen == "addstudentscreen") UI.closeNamePredictionSuggestions();
+        document.getElementById("profilesearchscreen_searchBox").addEventListener("change", function(e) {
+            profileFunctions.searchProfiles();
         });
     }
 };
@@ -154,10 +174,91 @@ const UI = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+Application Core Module
+Central data management and coordination module for the detention tracking system.
+Handles all data persistence, synchronisation, and core application lifecycle.
+
+Data Storage:
+- detentions: Active detention records
+- studentProfiles: Student profile information
+- reports: Report log of all system actions
+- fridayDetentionsNeeded: Calculated list of students requiring Friday detention
+- attendanceTaken/attendanceTakenDate: Daily attendance tracking state
+
+Key Features:
+- Three-bin architecture using Netlify Functions as data proxies
+- Concurrency control via version headers (X-Version)
+- Automatic conflict detection and resolution (409 status handling)
+- Session timeout monitoring (3.5 minutes of inactivity)
+- Daily attendance reset at midnight Central Time
+- Comprehensive Report logging for all data modifications
+
+Version Control:
+Uses localStorage to track version numbers for each bin, enabling detection
+of concurrent modifications and preventing data loss from race conditions.
+*/
+
 const App = {
     fetchError: false,
     staleVersionError: false,
     lastHiddenTime: null,
+    loggingIn: false,
     timeout: 210000,
     detentions: [],
     studentProfiles: [],
@@ -213,7 +314,6 @@ const App = {
     //readData() - Fetches from all three data bins in parallel using Promise.all with an Array.map() function.
     readData: async function() {
         if(localStorage.stcd_authenticated != "true") return;
-        //Dedicated to use Promise.all for best performance (simultaneous operations)
         await Promise.all(App.bins.map(async (bin) => {
             try {
                 const response = await fetch(`/.netlify/functions/database-proxy?target=${encodeURIComponent(bin)}`, {method: "GET"});
@@ -240,7 +340,7 @@ const App = {
                 //the extracted data is logged to the console for debugging purposes if ever needed.
 
                 App.parseData(responseData, bin)
-                /*tShe raw JSON data is sent to App.parseData() with its corresponding bin argument. 
+                /*the raw JSON data is sent to App.parseData() with its corresponding bin argument. 
                 This assigns each local array (cache) to its corresponding data object.*/
             } 
             catch(error) {
@@ -253,6 +353,23 @@ const App = {
                 App.fetchError = true;
             }
         }));
+    },
+    authenticatePassword: async function(submission) {
+        //sends password submission to password-proxy.js
+        const response = await fetch("/.netlify/functions/password-proxy", {
+            method: "POST",
+            //"POST" method for simple data transfer
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({submission})
+        });
+
+        if(response.status == 200) return true;
+        if(response.status == 401) return false;
+        /*returns true or false based on what proxy returns. 
+          401 = incorrect password
+          200 = correct password
+        */
+        throw new Error(`HTTP error! Status: ${response.status}`);
     },
     //parseData() - Distributes fetched data to appropriate properties
     parseData: async function(data, bin) {
@@ -329,14 +446,13 @@ const App = {
         profileFunctions.syncProfiles();
         detentionListFunctions.loadDetentionList()
         fridayDetentionFunctions.checkFridayDetentions();
-
         //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
         await Promise.all([
             App.writeData(0),
             App.writeData(1),
             App.writeData(2)
         ]);
-        UI.updateLoading("none");
+        UI.updateLoading("none")
     },
     //The fileReport method accepts a type and "changeData" argument that specifies what data needs to be logged, and what bin / action it is relevant to.
     fileReport: function(type, changeData) {
@@ -407,6 +523,46 @@ const App = {
 
 
 
+
+
+
+/*
+    Entry Addition Functions Module
+    Handles the complete sequence for adding new detention entries to the database.
+    Manages form data collection, validation, entry creation, and data saving.
+
+    Detention Types Supported:
+    - Single: One detention on a weekday (Monday-Thursday)
+    - Double: Two detentions on separate weekdays (must be chronological)
+    - Friday: Special detention session on Friday
+
+    Validation Rules:
+    - Student names must be non-empty and cannot contain hyphens
+    - Year group must be selected from dropdown
+    - Single/Double detentions must be on weekdays (Mon-Thu only)
+    - Friday detentions must be on actual Fridays
+    - Second date in double detention must come after first date
+    - No scheduling conflicts - students cannot have multiple detentions on same date
+    - Reason and teacher fields are required
+
+    Each detention entry includes:
+    - Student info (name, year)
+    - Date(s) - either single "date" or "dateOne" / "dateTwo" for double detentions.
+    - Reason for detention
+    - Metadata (scheduling teacher, entry creation date/time)
+    - Unique 8-digit tag for identification
+
+
+
+
+
+
+
+
+    Reflection on (maybe overusing?) object methods. Catching out each error case is very important here,
+    so I made use of a lot of seperate methods here for the sake of de-bugging purposes. If one of these methods
+    ever become problematic, it should be relatively easy to catch the problem!
+*/
 
 const entryAdditionFunctions = {
     //The addDetentionEntry method initialises and manages the entire entry addition sequence.
@@ -588,7 +744,6 @@ const entryAdditionFunctions = {
                 if(App.detentions[i].name.toLowerCase() == loweredName) {
                     if(App.detentions[i].hasOwnProperty("dateOne")) {
                         if(App.detentions[i].dateOne == dateToCheck || App.detentions[i].dateTwo == dateToCheck) conflictDetected = true;
-                        //Fixed duplicate dateTwo checks instead of dateOne. Lovely headache.
                     }
                     else {
                         if(App.detentions[i].date == dateToCheck) conflictDetected = true;
@@ -628,7 +783,7 @@ const entryAdditionFunctions = {
     generateUniqueTag: function() {
         let tag;
         const existingTags = new Set(App.detentions.map(detention => detention.tag));
-        //Uses do / while statements to generate a tag that has no exact match in the database.
+        //Uses do / while statements to generate a tag that has no exact match in the database. Concept sourced from AI
         do {
             tag = String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
         } 
@@ -733,6 +888,72 @@ const entryAdditionFunctions = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+Entry Removal Functions Module
+Handles the safe deletion of detention entries from the system with proper
+validation, user confirmation, and data reporting.
+
+Safety Features:
+- Validates tag extraction from DOM before proceeding
+- Verifies detention exists in database before attempting removal
+- Requires explicit user confirmation to prevent accidental deletions
+- Logs removal action to report log (reports) before deletion
+- Provides user feedback at each step (errors, warnings, success)
+
+Important Note:
+Removal affects both current detention list and historical records. The system
+warns users that deleted entries are permanently removed from all views.
+
+Detention Type Detection:
+- "double" - has dateOne/dateTwo properties
+- "friday" - single date falling on Friday (day 5)
+- "single" - single date on weekday (Monday-Thursday)
+
+Error Handling:
+- Gracefully handles missing tags or non-existent detentions
+- Displays user-friendly error messages while logging technical details
+- Prevents data corruption by validating before modifying App.detentions
+
+Integration:
+- Triggered by delete button click (this.parentElement context)
+- Files report before deletion for compliance
+- Calls App.updateData() to persist changes across all data bins
+ */
+
 const entryRemovalFunctions = {
     removeDetentionEntry: async function() {
         const container = this.parentElement;
@@ -816,6 +1037,25 @@ const entryRemovalFunctions = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+Friday Detention Functions Module
+Manages the "3 strikes" Friday detention system where students automatically
+qualify for Friday detention after accumulating 3 regular detentions.
+*/
+
 const fridayDetentionFunctions = {
     /*
     initNeededFridayDetentionsScreen() - Renders clickable list of students
@@ -889,11 +1129,12 @@ const fridayDetentionFunctions = {
 
 
 
-
-
-
-
-
+/*
+ Detention List Functions Module
+ Renders and filters detention entries for two different views:
+ - Main Screen: Current/upcoming detentions filtered by time (All/Today/Upcoming) and year
+ - Record Screen: Historical detentions searchable by date and student name
+ */
 
 const detentionListFunctions = {
     //loadDetentionList() - Master function that clears, filters, and renders both lists
@@ -1014,7 +1255,7 @@ const detentionListFunctions = {
 
 /*Creating and maintaining a lot of DOM elements this way proved challenging. Unfortunately, I found implementing a UI library such
   as React difficult for this project. Given my limited knowledge of react, and the complexity of this so-far, I decided to just
-  handle dynamic UI this way.
+  handle dynamic UI this way. Definetly a learning curve.
 */
 
 
@@ -1033,10 +1274,21 @@ const detentionListFunctions = {
 
 
 
-
-
-
-
+/**
+ * View Entry Functions Module
+ * 
+ * Displays detailed information about individual detention entries in a dedicated
+ * view screen with formatted dates and metadata.
+ * 
+ * Key Functions:
+ * - viewEntry() - Extracts tag from DOM, finds detention, and displays details
+ * - displayDetentionDetails() - Populates view screen with student name, dates,
+ *   scheduling teacher, and reason
+ * - formatDetentionDates() - Formats single or double detention dates with weekday names
+ * - exitEntryScreen() - Returns to originating screen (main or record list)
+ * 
+ * Tracks viewingFrom property to enable proper back navigation after viewing.
+ */
 
 const viewEntryFunctions = {
     //this flag determines which menu the user entered a particular entry's menu from - record screen or the main menu.
@@ -1151,6 +1403,27 @@ const viewEntryFunctions = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+Profile Functions Module
+Manages student profile data including detention counts, attendance records,
+and profile search functionality.
+Profile Structure: name, year, detentions (count), fridayDetentions (count),
+detentionsMissed (dates array), detentionsLate (dates array)
+*/
 
 const profileFunctions = {
     //updateOrCreateStudentProfile() - Creates new profile if student doesn't exist
@@ -1296,6 +1569,18 @@ const profileFunctions = {
 
 
 
+
+
+
+
+
+
+/**
+Profile Viewer Functions Module
+Displays comprehensive student profile view with detention history, attendance
+issues, and behavior classification.
+Tracks UI.enteredFridayList to enable proper navigation from Friday detention screen.
+*/
 
 const profileViewerFunctions = {
     //viewStudentProfile() - Main entry point that orchestrates profile display
@@ -1487,6 +1772,16 @@ const profileViewerFunctions = {
 
 
 
+
+
+
+
+/*
+  Attendance Functions Module
+  Manages daily detention attendance tracking with one-time submission per day.
+  Attendance resets daily at midnight Coordinated Universal Time (handled by App.checkData).
+*/
+
 const attendanceFunctions = {
     /*
     verifyDetentionToday() - Checks if detentions are scheduled today and if
@@ -1641,11 +1936,10 @@ const attendanceFunctions = {
         if(!satisfied) App.showAlert("No valid date was found to reschedule a detention for " + name + ".", "warning");
         return result;
     },
-    //Performs date validation (I.e: checks for conflict, valid weekday, etc.)
     isValidDate: function(date, name) {
         const formattedDate = App.formatDate(date);
         let issueFound = false;
-        if(date.getDay() != 2 && date.getDay() != 3) issueFound = true;
+        if(date.getDay() != 3 && date.getDay() != 4) issueFound = true;
         const dateConflict = App.detentions.some(detention => {
             if(detention.date) {
                 return (detention.date == formattedDate) && detention.name == name;
@@ -1669,3 +1963,85 @@ const attendanceFunctions = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+  Basic Authentication Module
+  
+  Key Functions:
+  - window.onload - Auto-logs in if user previously authenticated (localStorage flag)
+  - logIn() - Validates password via proxy function
+*/
+
+window.onload = () => {
+    localStorage.stcd_authenticated == "true" ? App.start() : tickAuth();
+}
+
+async function logIn() {
+    if(App.loggingIn) return;
+    document.getElementById("passwordscreen").querySelector("button").innerHTML = "...";
+    App.loggingIn = true;
+
+    const logInSuccess = await App.authenticatePassword(passwordscreen_passwordBox.value);
+    document.getElementById("passwordscreen").querySelector("button").innerHTML = "Submit";
+    if(logInSuccess) {
+        localStorage.stcd_authenticated = "true";
+        App.start();
+        App.loggingIn = false;
+        return;
+    }
+    App.loggingIn = false;
+    App.showAlert("Incorrect Password.", "error")
+}
+
+function tickAuth() {
+    window.setTimeout("tickAuth()", 1000 / 60);
+    if(!App.loggingIn) {
+        if(UI.currentScreen == "passwordscreen" && localStorage.stcd_authenticated == "true") {
+            localStorage.stcd_authenticated = "false";
+            location.reload();
+        }
+        if(localStorage.stcd_authenticated != "true" && UI.currentScreen != "passwordscreen") location.reload();
+    }
+}
+
+const fetchWrapper = window.fetch;
+window.fetch = async function(...args) {
+    try {
+        if(localStorage.stcd_authenticated != "true" && args[0] != "/.netlify/functions/password-proxy") throw new Error("Not authenticated");
+        const response = await fetchWrapper.apply(this, args);
+        return response;
+    } 
+    catch(error) {
+        console.log("Fetch failed:", args[0], error);
+    }
+}
