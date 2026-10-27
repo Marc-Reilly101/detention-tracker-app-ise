@@ -1,11 +1,24 @@
 const UI = {
     currentScreen: "passwordscreen",
+    enteredFridayList: false,
 
     //The goTo method manages screen navigation and initialises form cleanup for relevant menus (profilesearchscreen, addstudentscreen, etc.)
     goTo: function(to, from) {
-        document.getElementById(to).style.display = "block";
+        var destinationScreen = to;
+        if(from == "addstudentscreen") this.resetScreen(from);
+        if(from == "profilesearchscreen" && destinationScreen != "viewprofilescreen") this.resetScreen(from);
+        if(from == "viewprofilescreen" && this.enteredFridayList) {
+            destinationScreen = "fridaydetentionsneededscreen";
+            this.enteredFridayList = false;
+        }
+        if(destinationScreen != "loadingscreen") this.currentScreen = destinationScreen;
+        if(destinationScreen == "viewentryscreen") viewEntryFunctions.viewingFrom = from;
+
+        //If it is detected that the destination screeen is fridaydetentionsneededscreen, proper handler methods are called.
+        if(destinationScreen == "fridaydetentionsneededscreen") fridayDetentionFunctions.initNeededFridayDetentionsScreen();
+
+        document.getElementById(destinationScreen).style.display = "block";
         document.getElementById(from).style.display = "none";
-        //mechanism for single-page application - screen transitions
     },
     //The updateLoading method manages transitions to the loading screen when needed. The currentScreen property tracks which menu was viewed last so that it can be properly restored.
     updateLoading: function(status) {
@@ -39,6 +52,12 @@ const UI = {
     },
     //The initEventListeners method adds all event listeners used throughout the app. This predominantly includes addstudentscreen menu elements.
     initEventListeners: function() {
+
+        document.getElementById("mainscreen_yearFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
+        document.getElementById("mainscreen_timeFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
+        document.getElementById("recordscreen_dateFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
+        document.getElementById("recordscreen_nameFilter").addEventListener("change", () => detentionListFunctions.loadDetentionList());
+
         document.getElementById("addstudentscreen_singleDetentionRadio").addEventListener("change", function(e) {
             if(addstudentscreen_singleDetentionRadio.checked) {
                 addstudentscreen_singleDetentionConfig.style.display = "block";
@@ -88,6 +107,7 @@ const App = {
         await this.checkData();
         fridayDetentionFunctions.checkFridayDetentions();
         UI.initEventListeners()
+        detentionListFunctions.loadDetentionList();
         UI.updateLoading("none")
     },
     //The formatDate method generates a string in the yyyy-mm-dd format from a JavaScript date object.
@@ -218,6 +238,7 @@ const App = {
     updateData: async function(wait = true) {
         if(wait) UI.updateLoading("busy")
         //Another Promise.all statement to execute all write operations in parallel, minimising wait times.
+        detentionListFunctions.loadDetentionList()
         fridayDetentionFunctions.checkFridayDetentions();
         await Promise.all([
             App.writeData(0),
@@ -654,3 +675,164 @@ const fridayDetentionFunctions = {
 };
 
 //It's a bit bare-bones, but for this use-case, it works perfectly fine.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const detentionListFunctions = {
+    //loadDetentionList() - Master function that clears, filters, and renders both lists
+    loadDetentionList: function() {
+        const currentList = document.getElementById("mainscreen_detentionsList");
+        const recordList = document.getElementById("recordscreen_detentionsList");
+        currentList.innerHTML = "";
+        recordList.innerHTML = "";
+        mainscreen_emptyLabel.style.display = "none";
+        recordscreen_emptyLabel.style.display = "none";
+        
+        const requiredEntries = this.filterMainScreenDetentions();
+        const requiredRecordEntries = this.filterRecordScreenDetentions();
+    
+        this.renderDetentionList(requiredEntries, currentList);
+        this.renderDetentionList(requiredRecordEntries, recordList);
+
+        //Displays "empty" message when no detentions match current filters.
+        if(currentList.innerHTML == "") mainscreen_emptyLabel.style.display = "block";
+        if(recordList.innerHTML == "") recordscreen_emptyLabel.style.display = "block";
+    },
+    //filterMainScreenDetentions() - Filters by completion date and year group
+    filterMainScreenDetentions: function() {
+        const timeFilter = mainscreen_timeFilter.value;
+        const yearFilter = mainscreen_yearFilter.value;
+        const now = App.getCentralDate();
+        
+        return App.detentions.filter(detention => {
+            const finishingDate = detentionListFunctions.getFinishingDate(detention);
+            const startingDate = detentionListFunctions.getStartingDate(detention);
+            const passesTimeFilter = (timeFilter == "All" && finishingDate >= now) || (timeFilter == "Today" && (finishingDate == now || startingDate == now)) || (timeFilter == "Upcoming" && finishingDate > now);
+            if(!passesTimeFilter) return false;
+            return yearFilter == "All Years" || detention.year == yearFilter;
+        });
+    },
+    //filterRecordScreenDetentions() - Searches by specific date or student name
+    filterRecordScreenDetentions: function() {
+        const dateFilter = recordscreen_dateFilter.value;
+        const nameFilter = recordscreen_nameFilter.value;
+        
+        if(!dateFilter && !nameFilter) return App.detentions;
+        return App.detentions.filter(detention => {
+            const passesDateFilter = !dateFilter || detentionListFunctions.matchesDateFilter(detention, dateFilter);
+            const passesNameFilter = !nameFilter || detention.name.toLowerCase().includes(nameFilter.toLowerCase());
+            return passesDateFilter && passesNameFilter;
+        });
+    },
+    getFinishingDate: function(detention) {
+        return detention.dateTwo || detention.date;
+    },
+    getStartingDate: function(detention) {
+        return detention.dateOne || detention.date;
+    },
+    matchesDateFilter: function(detention, dateFilter) {
+        if(detention.dateOne) return dateFilter == detention.dateOne || dateFilter == detention.dateTwo;
+        return dateFilter == detention.date;
+    },
+    renderDetentionList: function(detentions, listElement) {
+        detentions.forEach(detention => {
+            const entryDiv = detentionListFunctions.createDetentionEntry(detention);
+            listElement.appendChild(entryDiv);
+        });
+    },
+    //createDetentionEntry() - Builds DOM element with detention info, View, and Remove buttons
+    createDetentionEntry: function(detention) {
+        const entryDiv = document.createElement("div");
+        entryDiv.style.marginBottom = "8px";
+        
+        entryDiv.innerHTML = detentionListFunctions.createDetentionHTML(detention);
+        entryDiv.appendChild(detentionListFunctions.createViewButton());
+        entryDiv.appendChild(detentionListFunctions.createRemoveButton());
+        return entryDiv;
+    },
+    //Populates each entry division element with appropriate HTML and CSS code. Returns a completed element.
+    createDetentionHTML: function(detention) {
+        const baseStyle = "float: left; border: 1px solid gray; width: 300px; padding: 8px;";
+        const leftStyle = baseStyle + " border-top-left-radius: 5px; border-bottom-left-radius: 5px;";
+        const rightStyle = baseStyle + " border-top-right-radius: 5px; border-bottom-right-radius: 5px;";
+        
+        const nameCell = `<div style="${leftStyle}">Name: ${detention.name}</div>`;
+        const yearCell = `<div style="${baseStyle}">Year: ${detention.year}</div>`;
+        var tagCell;
+        detention.notCounting ? tagCell = `<div style="${rightStyle}">Tag: ${detention.tag} (Rescheduled)</div>` : tagCell = `<div style="${rightStyle}">Tag: ${detention.tag}</div>`;
+        
+        let dateCell;
+        if(detention.dateOne) {
+            dateCell = `<div style="${baseStyle}">Dates: ${detention.dateOne} -- ${detention.dateTwo}</div>`;
+        } 
+        else {
+            const detentionDate = new Date(detention.date);
+            const weekDay = detentionDate.toLocaleDateString("en-US", { weekday: "long" });
+            dateCell = `<div style="${baseStyle}">Date: ${detention.date} (${weekDay})</div>`;
+        }
+
+        //Appends each component to each other to be returned
+        return nameCell + yearCell + dateCell + tagCell;
+    },
+    //Adds a view button to the side of the division element
+    createViewButton: function() {
+        const button = document.createElement("button");
+        button.className = "smallbutton";
+        button.style.marginRight = "5px";
+        button.style.marginLeft = "5px";
+        button.innerHTML = "View";
+        button.onclick = viewEntryFunctions.viewEntry;
+        return button;
+    },
+    //Adds a remove button to the side of the division element
+    createRemoveButton: function() {
+        const button = document.createElement("button");
+        button.className = "smallbutton-red";
+        button.innerHTML = "Remove";
+        //uses the .bind() method to assign the removeDetentionEntry method caller to this button element. Solution sourced from AI.
+        button.onclick = entryRemovalFunctions.removeDetentionEntry.bind(button);
+        return button;
+    }
+};
+
+/*Creating and maintaining a lot of DOM elements this way proved challenging. Unfortunately, I found implementing a UI library such
+  as React difficult for this project. Given my limited knowledge of react, and the complexity of this so-far, I decided to just
+  handle dynamic UI this way.
+*/
