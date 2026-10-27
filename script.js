@@ -836,3 +836,104 @@ const detentionListFunctions = {
   as React difficult for this project. Given my limited knowledge of react, and the complexity of this so-far, I decided to just
   handle dynamic UI this way.
 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const viewEntryFunctions = {
+    //this flag determines which menu the user entered a particular entry's menu from - record screen or the main menu.
+    viewingFrom: "",
+    //Populates viewentryscreen and then toggles its visibility
+    viewEntry: function() {
+       const container = this.parentElement;
+        const entryTag = viewEntryFunctions.extractTagFromContainer(container);
+        const detentionEntry = viewEntryFunctions.findDetentionByTag(App.detentions, entryTag);
+        
+        viewEntryFunctions.displayDetentionDetails(detentionEntry);
+        UI.goTo("viewentryscreen", UI.currentScreen);
+    },
+    //Extracts an entry's tag from its HTML element.
+    extractTagFromContainer: function(container) {
+        const tagElement = Array.from(container.children).find(child => child.innerHTML.includes("Tag"));
+        if(!tagElement) {
+            App.showAlert("An unexpected error occured while viewing detention entry.", "warning");
+            console.error("No tag element found in container");
+            return null;
+        }
+        return tagElement.innerHTML.split(" ")[1];
+    },
+    //Returns a particular detention entry based on its unique tag identifer
+    findDetentionByTag: function(detentions, tag) {
+        return detentions.find(detention => detention.tag == tag);
+    },
+    //Populates specific labels in the view entry screen with information sourced from the entry's dedicated object
+    displayDetentionDetails: function(detention) {
+        viewentryscreen_nameLabel.innerHTML = detention.name;
+        viewentryscreen_dateLabel.innerHTML = viewEntryFunctions.formatDetentionDates(detention);
+        viewentryscreen_entryDataLabel.innerHTML = viewEntryFunctions.formatTeacherInfo(detention);
+        viewentryscreen_reasonLabel.innerHTML = detention.reason;
+        viewentryscreen_absentLabel.innerHTML = "";
+        viewentryscreen_rescheduledLabel.innerHTML = "";
+        viewentryscreen_tagLabel.innerHTML = detention.tag;
+
+        var wasAbsent = false;
+        var detentionType = "single";
+        if(detention.hasOwnProperty("dateOne")) detentionType = "double";
+
+        App.studentProfiles.forEach((profile) => {
+            if(detentionType == "single") {
+                if(profile.detentionsMissed.includes(detention.date) && (profile.name == detention.name && profile.year == detention.year)) wasAbsent = true;
+            }
+            else {
+                if((profile.detentionsMissed.includes(detention.dateOne) || profile.detentionsMissed.includes(detention.dateTwo)) && (profile.name == detention.name && profile.year == detention.year)) wasAbsent = true;
+            }
+        });
+
+        //Appends dedicated absent labels
+        if(wasAbsent && detentionType == "single") viewentryscreen_absentLabel.innerHTML = "This student was absent for this detention.";
+        if(wasAbsent && detentionType == "double") viewentryscreen_absentLabel.innerHTML = "This student was absent for one or both dates of this detention.";
+
+    },
+    //Formats single and double detention dates
+    formatDetentionDates(detention) {
+        if(detention.dateOne && detention.dateTwo) return viewEntryFunctions.formatTwoDateDetention(detention.dateOne, detention.dateTwo);
+        return viewEntryFunctions.formatSingleDateDetention(detention.date);
+    },
+    //Returns a string providing clear calender information regarding an entry
+    formatTwoDateDetention(dateOne, dateTwo) {
+        const dayOne = viewEntryFunctions.getWeekdayName(dateOne);
+        const dayTwo = viewEntryFunctions.getWeekdayName(dateTwo);
+        return `Detentions on ${dateOne} (${dayOne}) -- ${dateTwo} (${dayTwo})`;
+    },
+    //Returns a string providing clear calender information regarding an entry
+    formatSingleDateDetention: function(date) {
+        const weekday = viewEntryFunctions.getWeekdayName(date);
+        return `Detention on ${date} (${weekday})`;
+    },
+    //Returns the weekday from a particular date string
+    getWeekdayName: function(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString("en-US", { weekday: "long" });
+    },
+    exitEntryScreen: function() {
+        UI.goTo(this.viewingFrom, "viewentryscreen")
+    }
+};
