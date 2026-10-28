@@ -1,3 +1,4 @@
+![image](https://i.imgur.com/Qyl1uVl.png)
 # Detention Tracker Application - ISE Entrance Submission
 *Technology Project Report for University of Limerick - ISE Submission*
 
