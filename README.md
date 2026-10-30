@@ -69,5 +69,5 @@ The application was not developed alongside git. This repository's commit histor
   
 ### Note on use of AI
 Certain areas of the codebase were developed with *the help* of artificial intelligence. Usage was limited to where assistance was genuinely needed to solve an issue, or to suggest
-ways to improve existing infrastructure. In limited circumstances, AI-generated concepts were sourced and deployed, however the core architecture and codebase as it stands is my work. All usage of AI is recorded, and is labelled accordingly in the repository. All concepts derived from AI were tested rigorously before deployment.
+ways to improve existing infrastructure. In limited circumstances, AI-generated concepts were sourced and deployed, however the core architecture of the codebase and the written syntax as it stands is my work. All usage of AI is recorded, and is labelled accordingly in the repository. All concepts derived from AI were tested rigorously before deployment.
 *The design of this application's user interface, the codebase architecture and the application's features are exclusively my work.*
