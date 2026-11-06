@@ -1454,6 +1454,8 @@ const profileFunctions = {
             var yearGroup = App.studentProfiles[profileIndex].year;
             var foundProfileDetentions = [];
             var foundProfileFridayDetentions = [];
+            const foundRescheduledDetentions = [];
+
             App.studentProfiles[profileIndex].detentions = 0;
             App.studentProfiles[profileIndex].fridayDetentions = 0;
 
@@ -1467,6 +1469,9 @@ const profileFunctions = {
                         if(App.detentions[j].hasOwnProperty("date") && new Date(App.detentions[j].date).getDay() != 5) foundProfileDetentions.push(App.detentions[j].date);
                         if(App.detentions[j].hasOwnProperty("date") && new Date(App.detentions[j].date).getDay() == 5) foundProfileFridayDetentions.push(App.detentions[j].date);
                     }
+                    else {
+                        foundRescheduledDetentions.push(App.detentions[j].date);
+                    }
                 }
             }
             App.studentProfiles[profileIndex].detentions = foundProfileDetentions.length;
@@ -1474,11 +1479,16 @@ const profileFunctions = {
 
             var removingAbsentDates = [];
             var removingLateDates = [];
+
             App.studentProfiles[profileIndex].detentionsMissed.forEach((date) => {
-                if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingAbsentDates.push(date);
+                if(!foundRescheduledDetentions.includes(date)) {
+                    if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingAbsentDates.push(date);
+                }
             });
             App.studentProfiles[profileIndex].detentionsLate.forEach((date) => {
-                if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingLateDates.push(date);
+                if(!foundRescheduledDetentions.includes(date)) {
+                    if(!foundProfileDetentions.includes(date) && !foundProfileFridayDetentions.includes(date)) removingLateDates.push(date);
+                }
             });
 
             removingAbsentDates.forEach((date) => {
@@ -1661,6 +1671,7 @@ const profileViewerFunctions = {
         html += this.addLateBadges(detention, profile);
         
         element.innerHTML = html;
+        if(element.innerHTML.includes("Absent")) element.style.backgroundColor = "#eba2a2";
         return element;
     },
     addTeacherBadge: function(detention) {
@@ -1672,22 +1683,22 @@ const profileViewerFunctions = {
         return `<b>(${detention.date})</b>`;
     },
     addFridayBadge: function(detention) {
-        if(detention.date && new Date(detention.date).getDay() == 5) return "- <b style='color: red'>Friday</b> ";
+        if(detention.date && new Date(detention.date).getDay() == 5) return " - <b style='color: red'>Friday</b> ";
         return "";
     },
     addAbsenceBadges: function(detention, profile) {
-        if(detention.date) return profile.detentionsMissed.includes(detention.date) ? "- <b style='color: red'>Absent</b> " : "";
+        if(detention.date) return profile.detentionsMissed.includes(detention.date) ? " - <b style='color: red'>Absent</b> " : "";
         const missedDayOne = profile.detentionsMissed.includes(detention.dateOne);
         const missedDayTwo = profile.detentionsMissed.includes(detention.dateTwo);
         
         if(missedDayOne && missedDayTwo) {
-            return "- <b style='color: red'>Absent Both Days</b> ";
+            return " - <b style='color: red'>Absent Both Days</b> ";
         } 
         else if(missedDayOne) {
-            return "- <b style='color: red'>Absent Day One</b> ";
+            return " - <b style='color: red'>Absent Day One</b> ";
         } 
         else if(missedDayTwo) {
-            return "- <b style='color: red'>Absent Day Two</b> ";
+            return " - <b style='color: red'>Absent Day Two</b> ";
         }
         return "";
     },
